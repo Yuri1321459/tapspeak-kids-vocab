@@ -470,5 +470,3 @@
     settings: renderSettings
   };
 })();
-
-
