@@ -1,285 +1,292 @@
-/* TapSpeak Kids Vocab
- * Version: v2025-01b
- */
+// TapSpeak Kids Vocab
+// Version: v2025-01b
 
-:root{
-  --bg-light:#f7f8fb;
-  --card:#ffffff;
-  --txt:#1b1f24;
+import {
+  getState,setCurrentUser,getPoints, ensureUser,
+  getSeVolume,setSeVolume,setUserIcon,
+  exportCurrentUser, importCurrentUser,
+  getPin,setPin, resetPointsCurrent, resetLearningCurrentKeepAvatar
+} from "./storage.js";
+import { renderWords } from "./words.js";
+import { renderReview } from "./review.js";
+import { setVolume, playSfx } from "./audio.js";
 
-  --bg-dark:#1f2328;
-  --card-dark:#2a2f36;
-  --txt-dark:#f2f4f7;
+const root = document.getElementById("app");
 
-  --blue:#4aa3ff;
-  --green:#40b36b;
-  --red:#e05555;
-
-  --muted:#7a8696;
-}
-
-*{box-sizing:border-box}
-body{
-  margin:0;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  background:var(--bg-light);
-  color:var(--txt);
+function clearRootTheme(){
+  root.className = "";
+  document.body.className = "";
 }
 
-button{
-  font-size:16px;
-  padding:8px 14px;
-  border-radius:10px;
-  border:none;
-  cursor:pointer;
-}
-button:disabled{opacity:.5}
-
-header{
-  position:sticky;
-  top:0;
-  z-index:10;
-  background:var(--bg-light);
-  padding:8px 10px;
-  border-bottom:1px solid #ddd;
-}
-.header-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-}
-.header-row + .header-row{ margin-top:6px; }
-
-.iconbtn{
-  background:none;
-  font-size:22px;
-  padding:4px 10px;
+function setReviewTheme(){
+  root.className = "review";
+  document.body.className = "review";
 }
 
-.tabs{ display:flex; gap:14px; }
-.tabbtn{
-  background:none;
-  font-weight:600;
-  color:#667085;
-  padding:6px 4px;
-  border-bottom:3px solid transparent;
-}
-.tabbtn.active{
-  color:#111827;
-  font-weight:900;
-  border-bottom-color: var(--blue);
+function headerHTML(mode){
+  const uid = getState().currentUserId;
+  const pts = uid ? getPoints(uid) : 0;
+
+  // mode: words | review | settings
+  return `
+<header>
+  <div class="header-row">
+    <button class="iconbtn" id="btnHome" type="button">🏠</button>
+    <div id="pointsBox">⭐${pts}</div>
+  </div>
+  <div class="header-row">
+    <div class="tabs">
+      <button class="tabbtn ${mode==="words"?"active":""}" id="tabWords" type="button">たんご</button>
+      <button class="tabbtn ${mode==="review"?"active":""}" id="tabReview" type="button">ふくしゅう</button>
+      <button class="tabbtn ${mode==="settings"?"active":""}" id="tabSettings" type="button">設定</button>
+    </div>
+    <div class="filters" id="filters"></div>
+  </div>
+</header>`;
 }
 
-.filters{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+function userButtonHTML(id, label, initial){
+  const st = getState();
+  const u = st.users?.[id];
+  const icon = u?.icon;
 
-.drop{ position:relative; }
-.dropBtn{
-  background:#eef2f7;
-  color:#111827;
-  border-radius:8px;
-  font-weight:800;
-}
-.dropPanel{
-  position:absolute;
-  top:44px;
-  left:0;
-  background:#fff;
-  border:1px solid #cfd6df;
-  border-radius:12px;
-  padding:10px;
-  min-width:240px;
-  z-index:20;
-  box-shadow:0 12px 32px rgba(0,0,0,.12);
-}
-.dropPanel.hidden{display:none}
-.dropGrid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:6px 12px;
-}
-.dropItem{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  font-size:14px;
-  padding:6px 6px;
-  border-radius:10px;
-}
-.dropItem:hover{ background:#f3f5f8; }
+  const iconHtml = icon
+    ? `<span class="usericon"><img src="${icon}" alt=""></span>`
+    : `<span class="usericon">${initial}</span>`;
 
-.screen{ padding:12px; }
-
-.card{
-  background:var(--card);
-  border-radius:16px;
-  padding:12px;
-  margin-bottom:14px;
-  box-shadow:0 8px 22px rgba(0,0,0,.06);
+  return `<button class="userbtn" data-u="${id}" type="button">${iconHtml}${label}</button>`;
 }
 
-.wordgrid{
-  display:grid;
-  grid-template-columns:140px 1fr;
-  gap:10px;
-}
-.thumbWrap{
-  width:140px;
-  height:140px;
-  border-radius:14px;
-  background:#eef2f7;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  overflow:hidden;
-}
-.thumbWrap img{ width:100%; height:100%; object-fit:contain; }
-.wordInThumb{
-  padding:8px;
-  text-align:center;
-  font-size:22px;
-  font-weight:900;
-  word-break:break-word;
-  line-height:1.1;
+function showHome(){
+  clearRootTheme();
+  const st = getState();
+
+  root.innerHTML = `
+<div class="home-select">
+  <h2 class="home-title">えいたんごをおぼえよう！</h2>
+  ${userButtonHTML("riona","りおな","R")}
+  ${userButtonHTML("soma","そうま","S")}
+  ${userButtonHTML("dev","開発者","開")}
+  <div class="homerow">
+    <button class="bigbtn words" id="goWords" type="button">たんご</button>
+    <button class="bigbtn review" id="goReview" type="button">ふくしゅう</button>
+  </div>
+</div>`;
+
+  root.querySelectorAll(".userbtn").forEach(b=>{
+    b.onclick=()=>{
+      setCurrentUser(b.dataset.u);
+      ensureUser(b.dataset.u);
+      showWords();
+    };
+  });
+
+  root.querySelector("#goWords").onclick = () => {
+    if (!st.currentUserId) setCurrentUser("riona");
+    showWords();
+  };
+  root.querySelector("#goReview").onclick = () => {
+    if (!st.currentUserId) setCurrentUser("riona");
+    showReview();
+  };
 }
 
-.descRow{
-  display:flex;
-  gap:8px;
-  align-items:flex-start;
-}
-.spkbtn{
-  font-size:20px;
-  background:none;
-  padding:4px 10px;
-}
-.desc{ margin:0; line-height:1.4; }
-
-.actions{
-  margin-top:10px;
-  display:flex;
-  gap:10px;
+function mountHeader(mode){
+  root.innerHTML = headerHTML(mode);
+  root.querySelector("#btnHome").onclick = showHome;
+  root.querySelector("#tabWords").onclick = showWords;
+  root.querySelector("#tabReview").onclick = showReview;
+  root.querySelector("#tabSettings").onclick = showSettings;
 }
 
-.btn.ok{background:var(--green);color:#fff;font-weight:900}
-.btn.ng{background:var(--red);color:#fff;font-weight:900}
-.btn.blue{background:var(--blue);color:#06243b;font-weight:900}
+function showWords(){
+  clearRootTheme();
+  const st = getState();
+  if(!st.currentUserId){ showHome(); return; }
 
-/* home */
-.home-select{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:18px;
-  padding:50px 12px 60px;
-}
-.home-title{
-  font-size:22px;
-  font-weight:1000;
-  margin:0 0 6px;
-  text-align:center;
-}
-.userbtn{
-  width:240px;
-  padding:14px 16px;
-  font-size:22px;
-  border-radius:16px;
-  background:#eef2f7;
-  font-weight:900;
-  display:flex;
-  align-items:center;
-  justify-content:flex-start;
-  gap:12px;
-}
-.usericon{
-  width:48px;
-  height:48px;
-  border-radius:14px;
-  background:#cfd6df;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  font-weight:1000;
-  overflow:hidden;
-}
-.usericon img{ width:100%; height:100%; object-fit:cover; display:block; }
+  mountHeader("words");
 
-.homerow{
-  display:flex;
-  gap:14px;
-  justify-content:center;
-  margin-top:12px;
-}
-.bigbtn{
-  width:160px;
-  padding:16px 14px;
-  border-radius:16px;
-  font-size:20px;
-  font-weight:1000;
-}
-.bigbtn.words{ background:#e8f0ff; }
-.bigbtn.review{ background:#e8f7ef; }
+  const screenHost = document.createElement("div");
+  root.appendChild(screenHost);
 
-/* review dark theme */
-.review{
-  background:var(--bg-dark);
-  color:var(--txt-dark);
-  min-height:100vh;
-}
-.review header{
-  background:var(--bg-dark);
-  border-bottom:1px solid rgba(255,255,255,.12);
-}
-.review .card{
-  background:var(--card-dark);
-  box-shadow:none;
-}
-.review .dropBtn{
-  background:#3a414b;
-  color:#fff;
-}
-.review .dropPanel{
-  background:#2a2f36;
-  border-color:rgba(255,255,255,.12);
-}
-.review .dropItem:hover{ background:rgba(255,255,255,.06); }
-.review .tabbtn{ color:#b8c0cc; }
-.review .tabbtn.active{
-  color:#fff;
-  border-bottom-color:#fff;
-}
-.review .thumbWrap{ background:#3a414b; }
-.review .btn.blue{ background:#2b7bd6; color:#fff; }
-.review .btn.ok{ background:#2f9e63; color:#fff; }
-.review .btn.ng{ background:#cc4444; color:#fff; }
-
-/* popup */
-.popup{
-  position:fixed;
-  top:18%;
-  left:50%;
-  transform:translateX(-50%);
-  background:rgba(0,0,0,.88);
-  color:#fff;
-  padding:14px 22px;
-  border-radius:14px;
-  font-size:20px;
-  z-index:50;
-  opacity:.95;
-  font-weight:1000;
+  renderWords(root).catch(()=>{
+    screenHost.innerHTML = `<div class="screen"><div class="card">よみこみ に しっぱい しました</div></div>`;
+  });
 }
 
-/* settings */
-.settingsTitle{
-  font-size:20px;
-  font-weight:1000;
-  margin:0 0 10px;
+function showReview(){
+  const st = getState();
+  if(!st.currentUserId){ showHome(); return; }
+
+  setReviewTheme();
+  mountHeader("review");
+
+  const screenHost = document.createElement("div");
+  root.appendChild(screenHost);
+
+  renderReview(root, {
+    onPointGained: () => {
+      // 左上ポイント即時更新
+      const uid = getState().currentUserId;
+      const pts = getPoints(uid);
+      const box = root.querySelector("#pointsBox");
+      if (box) box.textContent = `⭐${pts}`;
+
+      // 0.5秒ポップアップ
+      popup("☆1ポイントゲット！！", 500);
+    }
+  }).catch(()=>{
+    screenHost.innerHTML = `<div class="screen"><div class="card">よみこみ に しっぱい しました</div></div>`;
+  });
 }
-.field{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  margin-top:10px;
+
+function showSettings(){
+  clearRootTheme();
+  const st = getState();
+  if(!st.currentUserId){ showHome(); return; }
+
+  mountHeader("settings");
+
+  // 音量の反映
+  setVolume(getSeVolume());
+
+  const screen = document.createElement("div");
+  screen.className = "screen";
+  screen.innerHTML = `
+<div class="card">
+  <div class="settingsTitle">設定</div>
+
+  <div class="field">
+    <label>効果音音量</label>
+    <input id="seVol" type="range" min="0" max="1" step="0.05" value="${getSeVolume()}">
+    <div class="small">※ 動かすとすぐ鳴ります。</div>
+  </div>
+
+  <div class="field">
+    <label>ユーザーアイコン変更</label>
+    <input id="iconFile" type="file" accept="image/*">
+    <div class="small">※ 端末から選んだ画像を保存します。</div>
+  </div>
+
+  <div class="field">
+    <label>バックアップ作成（現在ユーザー）</label>
+    <button class="btn blue" id="btnBackup" type="button">バックアップを作る</button>
+  </div>
+
+  <div class="field">
+    <label>バックアップ読込（上書き）</label>
+    <input id="restoreFile" type="file" accept="application/json">
+  </div>
+
+  <div class="field">
+    <label>PIN変更（4桁）</label>
+    <input id="pinBox" inputmode="numeric" maxlength="4" placeholder="1234" value="${getPin()}">
+    <div class="small">※ ポイントリセット／学習全リセットで使います。</div>
+  </div>
+
+  <div class="field">
+    <label>ポイントリセット（PIN要）</label>
+    <button class="btn ng" id="btnResetPoints" type="button">ポイントをリセット</button>
+  </div>
+
+  <div class="field">
+    <label>学習全リセット（PIN要・アバター保持）</label>
+    <button class="btn ng" id="btnResetAll" type="button">学習をリセット</button>
+  </div>
+</div>
+`;
+  root.appendChild(screen);
+
+  // ①音量：動かしたら即鳴る
+  const seVol = screen.querySelector("#seVol");
+  seVol.oninput = () => {
+    const v = Number(seVol.value);
+    setSeVolume(v);
+    setVolume(v);
+    playSfx("speak_start"); // すぐ確認できる音
+  };
+
+  // ②アイコン変更
+  screen.querySelector("#iconFile").onchange = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const dataUrl = await fileToDataURL(f);
+    setUserIcon(getState().currentUserId, dataUrl);
+    showHome();
+  };
+
+  // ③バックアップ作成
+  screen.querySelector("#btnBackup").onclick = () => {
+    const obj = exportCurrentUser();
+    if (!obj) return;
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type:"application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tapspeak_backup_${obj.user_id}_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ④バックアップ読込（上書き）
+  screen.querySelector("#restoreFile").onchange = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const text = await f.text();
+    try{
+      const obj = JSON.parse(text);
+      importCurrentUser(obj);
+      popup("よみこみ しました", 600);
+    }catch{
+      popup("よみこみ に しっぱい しました", 900);
+    }
+  };
+
+  // ⑤PIN変更
+  const pinBox = screen.querySelector("#pinBox");
+  pinBox.oninput = () => {
+    const v = String(pinBox.value || "").replace(/\D/g,"").slice(0,4);
+    pinBox.value = v;
+    if (v.length === 4) setPin(v);
+  };
+
+  // ⑥ポイントリセット
+  screen.querySelector("#btnResetPoints").onclick = () => {
+    if (!checkPin()) return;
+    resetPointsCurrent();
+    popup("ポイント を 0 に しました", 700);
+  };
+
+  // ⑦学習全リセット
+  screen.querySelector("#btnResetAll").onclick = () => {
+    if (!checkPin()) return;
+    resetLearningCurrentKeepAvatar();
+    popup("がくしゅう を りせっと しました", 700);
+  };
 }
-label{ font-weight:900; }
-input[type="range"]{ width:100%; }
-.small{ color:var(--muted); font-size:12px; margin:6px 0 0; }
+
+function checkPin(){
+  const pin = prompt("PINを入力（4桁）");
+  if (pin === null) return false;
+  return String(pin) === getPin();
+}
+
+function popup(text, ms){
+  const d=document.createElement("div");
+  d.className="popup";
+  d.textContent=text;
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(), ms || 500);
+}
+
+async function fileToDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+// 起動
+showHome();
