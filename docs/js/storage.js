@@ -1,236 +1,151 @@
-const KEY = "tapspeak_state_v1";
+const LS_KEY = "tapspeak_v1";
 
-function defaultState() {
-  return {
-    currentUserId: null,
-    users: {
-      riona: { id: "riona", label: "りおな", points: 0 },
-      soma: { id: "soma", label: "そうま", points: 0 },
-    },
-    progressByUser: {},          // progressByUser[userId][wordId] = { stage, due }
-    wrongTodayByUser: {},        // wrongTodayByUser[userId] = { date, map: { [wordId]: true } }
-    reviewStatsByUser: {},       // reviewStatsByUser[userId] = { correctSincePoint: number }
-    avatarsByUser: {},           // avatarsByUser[userId] = dataURL
-    pin: "",
-    sfxVolume: 0.8,              // 0.0 - 1.0
-  };
+function loadAll() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveAll(obj) {
+  localStorage.setItem(LS_KEY, JSON.stringify(obj));
+}
+
+function todayLocalYYYYMMDD() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function initIfNeeded() {
+  let db = loadAll();
+  if (!db || typeof db !== "object") {
+    db = {
+      schema: 1,
+      users: {
+        riona: { name: "りおな", initial: "R", iconDataUrl: null, points: 0, correctCount: 0, progress: {} },
+        soma:  { name: "そうま", initial: "S", iconDataUrl: null, points: 0, correctCount: 0, progress: {} },
+        dev:   { name: "開発者", initial: "D", iconDataUrl: null, points: 0, correctCount: 0, progress: {} },
+      },
+      ui: { seVolume: 0.8 },
+      state: { currentUserId: null },
+    };
+    saveAll(db);
+  }
+  // 進捗のキーが無い場合の保険
+  for (const uid of Object.keys(db.users || {})) {
+    db.users[uid].progress ||= {};
+    db.users[uid].points ||= 0;
+    db.users[uid].correctCount ||= 0;
+    db.users[uid].initial ||= uid.slice(0,1).toUpperCase();
+  }
+  db.ui ||= { seVolume: 0.8 };
+  if (typeof db.ui.seVolume !== "number") db.ui.seVolume = 0.8;
+  db.state ||= { currentUserId: null };
+  saveAll(db);
+  return db;
+}
+
+export function getDB() {
+  return initIfNeeded();
+}
+
+export function getUISettings() {
+  return getDB().ui;
+}
+
+export function setSeVolume(v) {
+  const db = getDB();
+  db.ui.seVolume = Math.max(0, Math.min(1, Number(v)));
+  saveAll(db);
 }
 
 export function getState() {
-  const raw = localStorage.getItem(KEY);
-  if (!raw) {
-    const st = defaultState();
-    localStorage.setItem(KEY, JSON.stringify(st));
-    return st;
-  }
-  try {
-    const st = JSON.parse(raw);
-    return { ...defaultState(), ...st };
-  } catch {
-    const st = defaultState();
-    localStorage.setItem(KEY, JSON.stringify(st));
-    return st;
-  }
+  return getDB().state;
 }
 
-function setState(st) {
-  localStorage.setItem(KEY, JSON.stringify(st));
+export function setCurrentUser(userId) {
+  const db = getDB();
+  db.state.currentUserId = userId;
+  saveAll(db);
 }
 
-export function ensureUser(id, labelOverride) {
-  const st = getState();
-  if (!st.users[id]) {
-    st.users[id] = { id, label: labelOverride || id, points: 0 };
-    setState(st);
-  } else if (labelOverride && st.users[id].label !== labelOverride) {
-    st.users[id].label = labelOverride;
-    setState(st);
-  }
-  return st.users[id];
+export function getUser(userId) {
+  const db = getDB();
+  return db.users?.[userId] || null;
 }
 
-export function getUsers() {
-  const st = getState();
-  return Object.values(st.users);
+export function listUsers() {
+  const db = getDB();
+  return Object.entries(db.users).map(([id, u]) => ({ id, ...u }));
 }
 
-export function setCurrentUserId(id) {
-  const st = getState();
-  st.currentUserId = id;
-  setState(st);
+export function ensureUser(userId) {
+  const u = getUser(userId);
+  if (!u) throw new Error("user not found");
+  return u;
 }
 
-/* ===== Avatar ===== */
-export function getAvatarDataUrl(userId) {
-  const st = getState();
-  return st.avatarsByUser?.[userId] || "";
+/* progress record:
+{
+  stage: 0..6,
+  due: "YYYY-MM-DD",
+  wrongToday: true/false
 }
-
-export function setAvatarDataUrl(userId, dataUrl) {
-  const st = getState();
-  st.avatarsByUser = st.avatarsByUser || {};
-  st.avatarsByUser[userId] = dataUrl;
-  setState(st);
-}
-
-/* ===== PIN ===== */
-export function setPin(pin) {
-  const st = getState();
-  st.pin = (pin || "").trim();
-  setState(st);
-}
-
-export function getPin() {
-  const st = getState();
-  return (st.pin || "").trim();
-}
-
-/* ===== SE音量 ===== */
-export function getSfxVolume() {
-  const st = getState();
-  const v = Number(st.sfxVolume);
-  if (Number.isFinite(v)) return Math.max(0, Math.min(1, v));
-  return 0.8;
-}
-
-export function setSfxVolume(v01) {
-  const st = getState();
-  const v = Number(v01);
-  st.sfxVolume = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.8;
-  setState(st);
-}
-
-/* ===== Progress ===== */
+*/
 export function getProgress(userId, wordId) {
-  const st = getState();
-  const p = st.progressByUser?.[userId]?.[wordId];
-  return p ? { ...p } : null;
+  const u = ensureUser(userId);
+  return u.progress[wordId] || null;
 }
 
-export function setProgress(userId, wordId, progress) {
-  const st = getState();
-  st.progressByUser = st.progressByUser || {};
-  st.progressByUser[userId] = st.progressByUser[userId] || {};
-  st.progressByUser[userId][wordId] = { ...progress };
-  setState(st);
+export function setProgress(userId, wordId, rec) {
+  const db = getDB();
+  const u = db.users[userId];
+  u.progress[wordId] = rec;
+  saveAll(db);
 }
 
 export function deleteProgress(userId, wordId) {
-  const st = getState();
-  if (st.progressByUser?.[userId]) {
-    delete st.progressByUser[userId][wordId];
-    setState(st);
-  }
+  const db = getDB();
+  const u = db.users[userId];
+  delete u.progress[wordId];
+  saveAll(db);
 }
 
-/* ===== Wrong today flags ===== */
-export function markWrongToday(userId, wordId, todayStr) {
-  const st = getState();
-  st.wrongTodayByUser = st.wrongTodayByUser || {};
-  const obj = st.wrongTodayByUser[userId] || { date: todayStr, map: {} };
-  if (obj.date !== todayStr) {
-    obj.date = todayStr;
-    obj.map = {};
-  }
-  obj.map[wordId] = true;
-  st.wrongTodayByUser[userId] = obj;
-  setState(st);
+export function getTodayStr() {
+  return todayLocalYYYYMMDD();
 }
 
-export function clearWrongToday(userId, wordId, todayStr) {
-  const st = getState();
-  const obj = st.wrongTodayByUser?.[userId];
-  if (!obj) return;
-  if (obj.date !== todayStr) return;
-  if (obj.map?.[wordId]) {
-    delete obj.map[wordId];
-    setState(st);
-  }
-}
-
-export function getWrongTodaySet(userId, todayStr) {
-  const st = getState();
-  const obj = st.wrongTodayByUser?.[userId];
-  if (!obj || obj.date !== todayStr) return {};
-  return obj.map || {};
-}
-
-/* ===== Points (review only) =====
-   return true if point gained this time
-*/
-export function addReviewCorrect(userId) {
-  const st = getState();
-  ensureUser(userId);
-  st.reviewStatsByUser = st.reviewStatsByUser || {};
-  const rs = st.reviewStatsByUser[userId] || { correctSincePoint: 0 };
-
-  rs.correctSincePoint += 1;
-
+export function addCorrect(userId) {
+  const db = getDB();
+  const u = db.users[userId];
+  u.correctCount = (u.correctCount || 0) + 1;
   let gained = false;
-  if (rs.correctSincePoint >= 10) {
-    rs.correctSincePoint = 0;
-    st.users[userId].points = (st.users[userId].points || 0) + 1;
+  if (u.correctCount >= 10) {
+    u.correctCount = 0;
+    u.points = (u.points || 0) + 1;
     gained = true;
   }
-
-  st.reviewStatsByUser[userId] = rs;
-  setState(st);
-  return gained;
+  saveAll(db);
+  return { gained, points: u.points, correctCount: u.correctCount };
 }
 
-export function resetPoints(userId) {
-  const st = getState();
-  ensureUser(userId);
-  st.users[userId].points = 0;
-  st.reviewStatsByUser = st.reviewStatsByUser || {};
-  st.reviewStatsByUser[userId] = { correctSincePoint: 0 };
-  setState(st);
+export function resetWrongToday(userId) {
+  const db = getDB();
+  const u = db.users[userId];
+  for (const k of Object.keys(u.progress || {})) {
+    if (u.progress[k]?.wrongToday) u.progress[k].wrongToday = false;
+  }
+  saveAll(db);
 }
 
-export function resetLearningKeepAvatar(userId) {
-  const st = getState();
-  ensureUser(userId);
-  st.progressByUser = st.progressByUser || {};
-  st.progressByUser[userId] = {};
-  st.wrongTodayByUser = st.wrongTodayByUser || {};
-  st.wrongTodayByUser[userId] = { date: "", map: {} };
-  st.reviewStatsByUser = st.reviewStatsByUser || {};
-  st.reviewStatsByUser[userId] = { correctSincePoint: 0 };
-  st.users[userId].points = 0;
-  setState(st);
-}
-
-/* ===== Backup ===== */
-export function exportBackupJson() {
-  const st = getState();
-  const payload = {
-    v: 1,
-    exported_at: new Date().toISOString(),
-    currentUserId: st.currentUserId || null,
-    users: st.users || {},
-    progressByUser: st.progressByUser || {},
-    wrongTodayByUser: st.wrongTodayByUser || {},
-    reviewStatsByUser: st.reviewStatsByUser || {},
-    avatarsByUser: st.avatarsByUser || {},
-    pin: st.pin || "",
-    sfxVolume: st.sfxVolume ?? 0.8,
-  };
-  return JSON.stringify(payload, null, 2);
-}
-
-export function importBackupJson(text) {
-  const obj = JSON.parse(text);
-  if (!obj || typeof obj !== "object") throw new Error("bad");
-
-  const st = defaultState();
-  st.currentUserId = obj.currentUserId ?? null;
-  st.users = obj.users ?? st.users;
-  st.progressByUser = obj.progressByUser ?? {};
-  st.wrongTodayByUser = obj.wrongTodayByUser ?? {};
-  st.reviewStatsByUser = obj.reviewStatsByUser ?? {};
-  st.avatarsByUser = obj.avatarsByUser ?? {};
-  st.pin = obj.pin ?? "";
-  st.sfxVolume = obj.sfxVolume ?? 0.8;
-
-  setState(st);
+export function setUserIconDataUrl(userId, dataUrl) {
+  const db = getDB();
+  db.users[userId].iconDataUrl = dataUrl || null;
+  saveAll(db);
 }
