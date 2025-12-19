@@ -352,7 +352,7 @@
 
         const btnTry = document.createElement("button");
         btnTry.type = "button";
-        btnTry.textContent = "いってみて";
+        btnTry.textContent = "いってみる";
         btnTry.classList.add("btnTry"); // R-8-4-3
 
         const btnHear = document.createElement("button");
@@ -381,17 +381,24 @@
         }
 
         btnTry.addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (window.AppAudio.isLocked()) return;
+  e.stopPropagation();
+  if (window.AppAudio.isLocked()) return;
 
-          window.AppAudio.playSE("speak_start");
-          setDisabledAll(true);
-          setTimeout(() => {
-            btnTry.style.display = "none";
-            btnHear.style.display = "block";
-            setDisabledAll(false);
-          }, 1000);
-        });
+  // 即時に音
+  window.AppAudio.playSE("speak_start");
+
+  // 即時に🎤表示
+  btnTry.textContent = "🎤";
+  setDisabledAll(true);
+
+  // 2秒後に🔊へ
+  setTimeout(() => {
+    btnTry.style.display = "none";
+    btnHear.style.display = "block";
+    setDisabledAll(false);
+  }, 2000);
+});
+
 
         btnHear.addEventListener("click", async (e) => {
           e.stopPropagation();
@@ -487,3 +494,4 @@
     makeReviewScreen
   };
 })();
+
