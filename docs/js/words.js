@@ -1,5 +1,4 @@
-/* Version: 0.01.3 */
-/* R-2-6: たんごモード */
+/* R-2-6: たんごモード一旦もとに戻す */
 (() => {
   let wordsCache = null;
 
@@ -130,66 +129,13 @@
     }
     panel.append(wrap);
 
-    // 外側クリックで閉じる（1画面につき1回だけ登録）
-    if (!renderFilterDropdown._docClickBound) {
-      document.addEventListener("click", (e) => {
-        const all = document.querySelectorAll(".dd.open");
-        for (const node of all) {
-          if (!node.contains(e.target)) node.classList.remove("open");
-        }
-      });
-      renderFilterDropdown._docClickBound = true;
-    }
+    // 外側クリックで閉じる
+    document.addEventListener("click", (e) => {
+      if (!dd.contains(e.target)) dd.classList.remove("open");
+    });
 
     dd.append(btn, panel);
     return dd;
-  }
-  renderFilterDropdown._docClickBound = false;
-
-  // 右上「アイコン＋名前」(壊れないように AppStorage.getAvatar の有無を吸収)
-  function userLabelFromId(id){
-    if (id === "riona") return "りおな";
-    if (id === "soma") return "そうま";
-    if (id === "dev") return "開発者";
-    return id;
-  }
-  function userFallbackFromId(id){
-    if (id === "riona") return "R";
-    if (id === "soma") return "S";
-    if (id === "dev") return "D";
-    return "?";
-  }
-  function safeGetAvatar(id){
-    try {
-      if (window.AppStorage && typeof window.AppStorage.getAvatar === "function") {
-        return window.AppStorage.getAvatar(id);
-      }
-    } catch (_) {}
-    return "";
-  }
-  function makeUserBadge(userId){
-    const box = document.createElement("div");
-    box.className = "userBadgeBtn";
-
-    const avatarBox = document.createElement("div");
-    avatarBox.className = "avatar";
-
-    const av = safeGetAvatar(userId);
-    if (av) {
-      const img = document.createElement("img");
-      img.alt = userLabelFromId(userId);
-      img.src = av;
-      avatarBox.append(img);
-    } else {
-      avatarBox.textContent = userFallbackFromId(userId);
-    }
-
-    const name = document.createElement("span");
-    name.className = "userBadgeName";
-    name.textContent = userLabelFromId(userId);
-
-    box.append(avatarBox, name);
-    return box;
   }
 
   function makeWordsScreen({ mount, userId, onGoHome, onGoReview }) {
@@ -222,8 +168,7 @@
     points.id = "pointsPill";
     points.textContent = `⭐ ${window.AppStorage.getPoints(userId)}`;
 
-    const badge = makeUserBadge(userId);
-    right1.append(points, badge);
+    right1.append(points);
     r1.append(left1, right1);
 
     // row2
@@ -449,3 +394,4 @@
     stageGroupOf
   };
 })();
+
