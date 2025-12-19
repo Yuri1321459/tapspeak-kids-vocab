@@ -447,13 +447,15 @@
   }
 
   // 起動
-  (() => {
-    // R-4-1: ユーザーID riona/soma/dev
-    for (const u of [...USERS, DEV]) window.AppStorage.ensureUser(u.id);
-    const cur = window.AppStorage.getCurrentUserId();
-    if (cur) renderHome();
-    else renderUserSelect();
-  })();
+(() => {
+  // R-4-1: ユーザーID riona/soma/dev
+  for (const u of [...USERS, DEV]) window.AppStorage.ensureUser(u.id);
+
+  // R-8-1-4: 起動直後は必ずユーザー選択画面
+  window.AppStorage.setCurrentUserId(null);
+  renderUserSelect();
+})();
+
 
   window.AppNav = {
     userSelect: renderUserSelect,
@@ -463,3 +465,4 @@
     settings: renderSettings
   };
 })();
+
