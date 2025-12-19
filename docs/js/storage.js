@@ -1,151 +1,53 @@
-const LS_KEY = "tapspeak_v1";
+// TapSpeak Kids Vocab
+// Version: v2025-01
 
-function loadAll() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
+const KEY = "tapspeak_state_v2025_01";
+
+export function getState(){
+  const raw = localStorage.getItem(KEY);
+  return raw ? JSON.parse(raw) : { users:{}, currentUserId:null };
+}
+export function saveState(st){
+  localStorage.setItem(KEY, JSON.stringify(st));
+}
+
+export function ensureUser(id){
+  const st = getState();
+  if(!st.users[id]){
+    st.users[id] = { progress:{}, points:0, icon:null };
+    saveState(st);
   }
 }
 
-function saveAll(obj) {
-  localStorage.setItem(LS_KEY, JSON.stringify(obj));
+export function setCurrentUser(id){
+  const st = getState();
+  st.currentUserId = id;
+  saveState(st);
 }
 
-function todayLocalYYYYMMDD() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+export function getProgress(uid,wid){
+  const st = getState();
+  return st.users[uid]?.progress[wid] || null;
 }
 
-function initIfNeeded() {
-  let db = loadAll();
-  if (!db || typeof db !== "object") {
-    db = {
-      schema: 1,
-      users: {
-        riona: { name: "りおな", initial: "R", iconDataUrl: null, points: 0, correctCount: 0, progress: {} },
-        soma:  { name: "そうま", initial: "S", iconDataUrl: null, points: 0, correctCount: 0, progress: {} },
-        dev:   { name: "開発者", initial: "D", iconDataUrl: null, points: 0, correctCount: 0, progress: {} },
-      },
-      ui: { seVolume: 0.8 },
-      state: { currentUserId: null },
-    };
-    saveAll(db);
-  }
-  // 進捗のキーが無い場合の保険
-  for (const uid of Object.keys(db.users || {})) {
-    db.users[uid].progress ||= {};
-    db.users[uid].points ||= 0;
-    db.users[uid].correctCount ||= 0;
-    db.users[uid].initial ||= uid.slice(0,1).toUpperCase();
-  }
-  db.ui ||= { seVolume: 0.8 };
-  if (typeof db.ui.seVolume !== "number") db.ui.seVolume = 0.8;
-  db.state ||= { currentUserId: null };
-  saveAll(db);
-  return db;
+export function setProgress(uid,wid,data){
+  const st = getState();
+  st.users[uid].progress[wid] = { ...st.users[uid].progress[wid], ...data };
+  saveState(st);
 }
 
-export function getDB() {
-  return initIfNeeded();
+export function deleteProgress(uid,wid){
+  const st = getState();
+  delete st.users[uid].progress[wid];
+  saveState(st);
 }
 
-export function getUISettings() {
-  return getDB().ui;
+export function addPoint(uid){
+  const st = getState();
+  st.users[uid].points += 1;
+  saveState(st);
 }
 
-export function setSeVolume(v) {
-  const db = getDB();
-  db.ui.seVolume = Math.max(0, Math.min(1, Number(v)));
-  saveAll(db);
-}
-
-export function getState() {
-  return getDB().state;
-}
-
-export function setCurrentUser(userId) {
-  const db = getDB();
-  db.state.currentUserId = userId;
-  saveAll(db);
-}
-
-export function getUser(userId) {
-  const db = getDB();
-  return db.users?.[userId] || null;
-}
-
-export function listUsers() {
-  const db = getDB();
-  return Object.entries(db.users).map(([id, u]) => ({ id, ...u }));
-}
-
-export function ensureUser(userId) {
-  const u = getUser(userId);
-  if (!u) throw new Error("user not found");
-  return u;
-}
-
-/* progress record:
-{
-  stage: 0..6,
-  due: "YYYY-MM-DD",
-  wrongToday: true/false
-}
-*/
-export function getProgress(userId, wordId) {
-  const u = ensureUser(userId);
-  return u.progress[wordId] || null;
-}
-
-export function setProgress(userId, wordId, rec) {
-  const db = getDB();
-  const u = db.users[userId];
-  u.progress[wordId] = rec;
-  saveAll(db);
-}
-
-export function deleteProgress(userId, wordId) {
-  const db = getDB();
-  const u = db.users[userId];
-  delete u.progress[wordId];
-  saveAll(db);
-}
-
-export function getTodayStr() {
-  return todayLocalYYYYMMDD();
-}
-
-export function addCorrect(userId) {
-  const db = getDB();
-  const u = db.users[userId];
-  u.correctCount = (u.correctCount || 0) + 1;
-  let gained = false;
-  if (u.correctCount >= 10) {
-    u.correctCount = 0;
-    u.points = (u.points || 0) + 1;
-    gained = true;
-  }
-  saveAll(db);
-  return { gained, points: u.points, correctCount: u.correctCount };
-}
-
-export function resetWrongToday(userId) {
-  const db = getDB();
-  const u = db.users[userId];
-  for (const k of Object.keys(u.progress || {})) {
-    if (u.progress[k]?.wrongToday) u.progress[k].wrongToday = false;
-  }
-  saveAll(db);
-}
-
-export function setUserIconDataUrl(userId, dataUrl) {
-  const db = getDB();
-  db.users[userId].iconDataUrl = dataUrl || null;
-  saveAll(db);
+export function getPoints(uid){
+  return getState().users[uid]?.points || 0;
 }
