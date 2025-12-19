@@ -52,7 +52,7 @@
     return [...map.values()].sort((a, b) => String(a.id).localeCompare(String(b.id)));
   }
 
-  function applyFilters(words, { catSel, stageSel, progressById, userId }) {
+  function applyFilters(words, { catSel, stageSel, progressById }) {
     // R-3-4: sort (category_id asc -> sort_order asc)
     const sorted = words
       .filter(w => w && w.enabled === true)
@@ -81,16 +81,11 @@
 
         const isUnenrolled = !pr;
         if (stageSel.has("みとうろく")) {
-          if (!isUnenrolled) {
-            // みとうろく選択中でも他の条件ORなので、他の段階一致なら通す
-          } else {
-            return true; // みとうろく一致
-          }
+          if (isUnenrolled) return true;
+          // enrolledはこのまま段階一致へ
         }
-        if (isUnenrolled) {
-          // みとうろく未選択なら通さない（他段階一致不能）
-          return false;
-        }
+        if (isUnenrolled) return false;
+
         const grp = stageGroupOf(Number(pr.stage));
         if (!stageSel.has(grp)) return false;
       }
@@ -127,6 +122,7 @@
 
       const span = document.createElement("span");
       span.textContent = it.label;
+      if (String(it.label).length >= 16) span.classList.add("small"); // R-7-5-2
 
       row.append(cb, span);
       wrap.append(row);
@@ -211,8 +207,8 @@
     mount.append(screen);
 
     // selections
-    const catSel = new Set(["ぜんかてごり"]); // R-9-1: 初期ぜんかてごり
-    const stageSel = new Set(["ぜんだんかい"]); // R-9-1: デフォルト全選択扱い（ぜんだんかい）
+    const catSel = new Set(["ぜんかてごり"]);  // 初期
+    const stageSel = new Set(["ぜんだんかい"]); // 初期
 
     function setPointsUI() {
       const el = screen.querySelector("#pointsPill");
@@ -236,7 +232,6 @@
         img.alt = w.word || "";
         img.src = imgPath(w);
         img.onerror = () => {
-          // R-3-3: 404でも落ちない（プレースホルダは最小）
           img.style.display = "none";
           const ph = document.createElement("div");
           ph.className = "subtle";
@@ -249,7 +244,7 @@
         overlay.style.display = "none";
         overlay.textContent = w.word || "";
 
-        // R-7-4/R-10-2: 画像タップで単語表示置換 + 単語TTS
+        // 画像タップ：単語表示＋単語TTS
         imgBox.addEventListener("click", async () => {
           if (window.AppAudio.isLocked()) return;
           overlay.style.display = overlay.style.display === "none" ? "flex" : "none";
@@ -266,7 +261,6 @@
         sp.className = "spkr";
         sp.type = "button";
         sp.textContent = "🔊";
-        // R-10-2: 説明TTS
         sp.addEventListener("click", async (e) => {
           e.stopPropagation();
           if (window.AppAudio.isLocked()) return;
@@ -287,22 +281,22 @@
         btn.type = "button";
 
         if (!pr) {
-          // R-9-1: 未Enroll -> おぼえた
           btn.textContent = "おぼえた";
+          btn.classList.add("btnOk"); // R-8-3-1
           btn.addEventListener("click", (e) => {
             e.stopPropagation();
             window.AppStorage.enrollWord(userId, wordId);
-            window.AppAudio.playSE("correct"); // R-10-1
+            window.AppAudio.playSE("correct");
             setPointsUI();
-            refresh(); // ボタン切替のため
+            refresh();
           });
         } else {
-          // R-9-1: Enroll済 -> わすれた（解除）
           btn.textContent = "わすれた";
+          btn.classList.add("btnNg"); // R-8-3-2
           btn.addEventListener("click", (e) => {
             e.stopPropagation();
             window.AppStorage.unenrollWord(userId, wordId);
-            window.AppAudio.playSE("wrong"); // R-10-1
+            window.AppAudio.playSE("wrong");
             setPointsUI();
             refresh();
           });
@@ -319,7 +313,7 @@
 
     function refresh() {
       const prog = window.AppStorage.getProgress(userId);
-      const filtered = applyFilters(allWords, { catSel, stageSel, progressById: prog, userId });
+      const filtered = applyFilters(allWords, { catSel, stageSel, progressById: prog });
       renderCards(filtered);
     }
 
@@ -328,10 +322,10 @@
 
       const catItems = [
         { key: "ぜんかてごり", label: "ぜんかてごり" },
-        ...categories.map(c => ({
-          key: c.id,
-          label: c.kana ? `${c.ja}（${c.kana}）` : c.ja
-        }))
+        ...categories.map(c => {
+          const label = c.kana ? `${c.ja}\n（${c.kana}）` : c.ja; // R-7-5-1
+          return { key: c.id, label };
+        })
       ];
 
       const ddCat = renderFilterDropdown({
@@ -340,7 +334,6 @@
         selected: catSel,
         grid2: true,
         onChange: (key, checked) => {
-          // R-9-1: ぜんかてごり特別扱い（単独）
           if (key === "ぜんかてごり" && checked) {
             catSel.clear();
             catSel.add("ぜんかてごり");
@@ -353,6 +346,7 @@
               if (catSel.size === 0) catSel.add("ぜんかてごり");
             }
           }
+          buildFilters(); // R-9-5: 見た目も同期
           refresh();
         }
       });
@@ -362,7 +356,6 @@
         items: STAGE_OPTIONS.map(o => ({ key: o.key, label: o.label })),
         selected: stageSel,
         onChange: (key, checked) => {
-          // R-9-1: ぜんだんかいは特別扱い（単独）
           if (key === "ぜんだんかい" && checked) {
             stageSel.clear();
             stageSel.add("ぜんだんかい");
@@ -375,6 +368,7 @@
               if (stageSel.size === 0) stageSel.add("ぜんだんかい");
             }
           }
+          buildFilters(); // R-9-6/R-9-7: 見た目も同期
           refresh();
         }
       });
