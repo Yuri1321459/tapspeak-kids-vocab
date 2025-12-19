@@ -1,114 +1,56 @@
-import { getSfxVolume } from "./storage.js";
-
-const SFX_BASE = "./assets/sounds/ui/";
+import { getUISettings } from "./storage.js";
 
 const SFX = {
-  speak_start: "speak_start.mp3",
-  correct: "correct.mp3",
-  wrong: "wrong.mp3",
-  point: "point.mp3",
+  speak_start: "./assets/sounds/ui/speak_start.mp3",
+  correct: "./assets/sounds/ui/correct.mp3",
+  wrong: "./assets/sounds/ui/wrong.mp3",
+  point: "./assets/sounds/ui/point.mp3",
 };
 
-let currentSfxAudio = null;
-
-export function stopAllAudio() {
-  if (currentSfxAudio) {
-    try {
-      currentSfxAudio.pause();
-      currentSfxAudio.currentTime = 0;
-    } catch {}
-    currentSfxAudio = null;
-  }
-  try {
-    window.speechSynthesis?.cancel();
-  } catch {}
-}
+let currentAudio = null;
 
 export function playSfx(name) {
-  const file = SFX[name];
-  if (!file) return;
+  const src = SFX[name];
+  if (!src) return;
 
-  if (currentSfxAudio) {
-    try {
-      currentSfxAudio.pause();
-      currentSfxAudio.currentTime = 0;
-    } catch {}
-    currentSfxAudio = null;
-  }
+  const { seVolume } = getUISettings();
 
-  const a = new Audio(SFX_BASE + file);
-  a.volume = getSfxVolume();
-  currentSfxAudio = a;
-
-  a.addEventListener("ended", () => {
-    if (currentSfxAudio === a) currentSfxAudio = null;
-  });
-
-  a.play().catch(() => {
-    // iOS制限などは黙る
-  });
+  try {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    }
+    const a = new Audio(src);
+    a.volume = Math.max(0, Math.min(1, Number(seVolume ?? 0.8)));
+    currentAudio = a;
+    a.play().catch(()=>{});
+  } catch {}
 }
 
-/* ===== TTS ===== */
 export function speakTTS(text) {
-  const t = (text || "").trim();
-  if (!t) return;
-
+  if (!text) return;
   try {
     window.speechSynthesis.cancel();
-  } catch {}
-
-  const u = new SpeechSynthesisUtterance(t);
-  u.lang = "en-US";
-  u.rate = 0.95;
-  u.pitch = 1.0;
-
-  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-US";
+    u.rate = 0.95;
+    u.pitch = 1.0;
     window.speechSynthesis.speak(u);
   } catch {}
 }
 
-/* ===== TTS（完了待ち）: 復習モード用 ===== */
-export function speakTTSWait(text) {
-  const t = (text || "").trim();
-  if (!t) return Promise.resolve();
-
-  return new Promise((resolve) => {
-    try {
-      window.speechSynthesis.cancel();
-    } catch {}
-
-    const u = new SpeechSynthesisUtterance(t);
-    u.lang = "en-US";
-    u.rate = 0.95;
-    u.pitch = 1.0;
-
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      resolve();
-    };
-
-    u.onend = finish;
-    u.onerror = finish;
-
-    // iOSでonendが飛ばない保険（長すぎない）
-    const fallbackMs = Math.min(5000, Math.max(1200, t.length * 70));
-    const timer = setTimeout(finish, fallbackMs);
-
-    const origFinish = finish;
-    const finishWrap = () => {
-      clearTimeout(timer);
-      origFinish();
-    };
-    u.onend = finishWrap;
-    u.onerror = finishWrap;
-
-    try {
-      window.speechSynthesis.speak(u);
-    } catch {
-      finishWrap();
-    }
-  });
+export function lockWhileSpeaking(onLocked) {
+  // Safariで完璧な検知は難しいので最小限
+  try {
+    if (!("speechSynthesis" in window)) return;
+    onLocked(true);
+    const check = setInterval(() => {
+      if (!speechSynthesis.speaking) {
+        clearInterval(check);
+        onLocked(false);
+      }
+    }, 120);
+  } catch {
+    onLocked(false);
+  }
 }
