@@ -55,6 +55,7 @@
 
       const span = document.createElement("span");
       span.textContent = it.label;
+      if (String(it.label).length >= 16) span.classList.add("small");
 
       row.append(cb, span);
       wrap.append(row);
@@ -186,18 +187,16 @@
     }
 
     function showPointFx() {
-      // R-6-2: point.mp3 + キラキラ + 0.5秒ポップアップ
       window.AppAudio.playSE("point");
       sparkle.classList.add("show");
       popup.classList.add("show");
       setTimeout(() => {
         sparkle.classList.remove("show");
         popup.classList.remove("show");
-      }, 500);
+      }, 1500); // R-8-4-7
     }
 
     function applyFiltersDue(today) {
-      // R-9-2: enrolled && (due<=today OR wrong_today today) AND filters
       const dueIds = window.AppStorage.listEnrolledDueWordIds(userId, today);
 
       const catAll = catSel.has("ぜんかてごり") || catSel.size === 0;
@@ -224,7 +223,6 @@
         out.push(wid);
       }
 
-      // 安定並び（words側の並び順）
       out.sort((a, b) => {
         const wa = wordById.get(a);
         const wb = wordById.get(b);
@@ -241,10 +239,10 @@
 
       const catItems = [
         { key: "ぜんかてごり", label: "ぜんかてごり" },
-        ...categories.map(c => ({
-          key: c.id,
-          label: c.kana ? `${c.ja}（${c.kana}）` : c.ja
-        }))
+        ...categories.map(c => {
+          const label = c.kana ? `${c.ja}\n（${c.kana}）` : c.ja;
+          return { key: c.id, label };
+        })
       ];
 
       const ddCat = renderFilterDropdown({
@@ -265,6 +263,7 @@
               if (catSel.size === 0) catSel.add("ぜんかてごり");
             }
           }
+          buildFilters(); // 見た目も同期
           refresh();
         }
       });
@@ -286,6 +285,7 @@
               if (stageSel.size === 0) stageSel.add("ぜんだんかい");
             }
           }
+          buildFilters(); // 見た目も同期
           refresh();
         }
       });
@@ -322,7 +322,6 @@
           imgBox.append(ph);
         };
 
-        // R-7-4: 画像タップで単語表示置換（復習でも共通）
         const overlay = document.createElement("div");
         overlay.className = "wordOverlay";
         overlay.style.display = "none";
@@ -341,7 +340,6 @@
         sp.className = "spkr";
         sp.type = "button";
         sp.textContent = "🔊";
-        // R-10-2: 説明TTSは仕様にない（復習は「せいかいをきく」で単語のみ）
         sp.style.visibility = "hidden";
 
         const desc = document.createElement("p");
@@ -352,24 +350,27 @@
         const actions = document.createElement("div");
         actions.className = "actions";
 
-        // R-9-3: 初期は「いってみて」だけ
         const btnTry = document.createElement("button");
         btnTry.type = "button";
         btnTry.textContent = "いってみて";
+        btnTry.classList.add("btnTry"); // R-8-4-3
 
         const btnHear = document.createElement("button");
         btnHear.type = "button";
-        btnHear.textContent = "せいかいをきく";
+        btnHear.textContent = "🔊"; // R-8-4-6
+        btnHear.classList.add("btnHear"); // R-8-4-3
         btnHear.style.display = "none";
 
         const btnO = document.createElement("button");
         btnO.type = "button";
         btnO.textContent = "○";
+        btnO.classList.add("btnOk"); // R-8-4-4
         btnO.style.display = "none";
 
         const btnX = document.createElement("button");
         btnX.type = "button";
         btnX.textContent = "×";
+        btnX.classList.add("btnNg"); // R-8-4-5
         btnX.style.display = "none";
 
         function setDisabledAll(disabled) {
@@ -379,14 +380,12 @@
           btnX.disabled = disabled;
         }
 
-        btnTry.addEventListener("click", async (e) => {
+        btnTry.addEventListener("click", (e) => {
           e.stopPropagation();
           if (window.AppAudio.isLocked()) return;
 
-          // R-10-1: speak_start.mp3（重ね再生禁止）
           window.AppAudio.playSE("speak_start");
           setDisabledAll(true);
-          // R-9-3: 1秒待機 → 置換
           setTimeout(() => {
             btnTry.style.display = "none";
             btnHear.style.display = "block";
@@ -398,7 +397,6 @@
           e.stopPropagation();
           if (window.AppAudio.isLocked()) return;
 
-          // R-9-3: 再生中は他操作不可
           window.AppAudio.lockTTS(true);
           setDisabledAll(true);
           try {
@@ -406,7 +404,6 @@
           } finally {
             window.AppAudio.lockTTS(false);
           }
-          // R-9-3: 終了後に ○/×
           btnO.style.display = "block";
           btnX.style.display = "block";
           setDisabledAll(false);
@@ -414,11 +411,9 @@
 
         btnO.addEventListener("click", (e) => {
           e.stopPropagation();
-          // R-9-3: 判定前変更禁止（ここから変更）
           const cur = window.AppStorage.getWordProgress(userId, wid);
           if (!cur) return;
 
-          // R-5-2: ○ stage+1（上限6） stage6でも上下あり
           const nextStage = Math.min(6, Number(cur.stage || 0) + 1);
           const nextDue = addDaysYYYYMMDD(today, STAGE_DAYS[nextStage]);
 
@@ -430,7 +425,6 @@
           window.AppStorage.setWordProgress(userId, wid, cur);
           window.AppAudio.playSE("correct");
 
-          // R-6-1: 10問○ごとに1ポイント（復習のみ）
           const { gained } = window.AppStorage.incrementCorrectAndMaybePoint(userId);
           setPointsUI();
           if (gained) showPointFx();
@@ -443,14 +437,11 @@
           const cur = window.AppStorage.getWordProgress(userId, wid);
           if (!cur) return;
 
-          // R-5-2: × stage-1（下限0）
           const nextStage = Math.max(0, Number(cur.stage || 0) - 1);
           cur.stage = nextStage;
 
-          // R-9-4: 当日中は○になるまで何度でも出題（フラグ化）
           cur.wrong_today = true;
           cur.wrong_today_date = today;
-          // due<=todayを確実化
           cur.due = today;
 
           window.AppStorage.setWordProgress(userId, wid, cur);
@@ -469,7 +460,6 @@
       const today = window.AppStorage.getTodayLocal();
       const dueFiltered = applyFiltersDue(today);
 
-      // R-8-4: 「いま やる ことば ◯こ」(フィルタ適用後)
       count.textContent = `いま やる ことば ${dueFiltered.length}こ`;
 
       renderCards(dueFiltered, today);
