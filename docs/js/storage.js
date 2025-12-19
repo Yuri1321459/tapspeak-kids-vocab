@@ -1,160 +1,263 @@
-// TapSpeak Kids Vocab
-// Version: v2025-01b
-
-const KEY = "tapspeak_state_v2025_01b";
-
-function defaultState(){
-  return {
-    users:{},
-    currentUserId:null,
-    settings:{
-      seVolume: 0.9,
-      pin: "1234"
+/* R-2-4: localStorage単一窓口 */
+(() => {
+  const NS = "TapSpeakVocab:v2025-01"; // R-12-1: 仕様外の拡張禁止（ここに集約）
+  const DEFAULT_USER = () => ({
+    points: 0,
+    correct_mod10: 0,
+    progress: {}, // wordId -> { enrolled_at, stage, due, wrong_today, wrong_today_date? }
+    settings: {
+      seVolume: 0.7,
+      ttsRate: 1.0,
+      voiceURI: "",
+      pin: "1234",
+      avatarDataUrl: ""
     }
-  };
-}
+  });
 
-export function getState(){
-  const raw = localStorage.getItem(KEY);
-  if(!raw) return defaultState();
-  try{
-    const st = JSON.parse(raw);
-    st.users ||= {};
-    st.settings ||= { seVolume:0.9, pin:"1234" };
-    if (typeof st.settings.seVolume !== "number") st.settings.seVolume = 0.9;
-    if (!st.settings.pin) st.settings.pin = "1234";
-    return st;
-  }catch{
-    return defaultState();
+  function _loadRoot() {
+    try {
+      const raw = localStorage.getItem(NS);
+      if (!raw) return { currentUserId: "", users: {} };
+      const obj = JSON.parse(raw);
+      if (!obj || typeof obj !== "object") return { currentUserId: "", users: {} };
+      obj.users ||= {};
+      obj.currentUserId ||= "";
+      return obj;
+    } catch {
+      return { currentUserId: "", users: {} };
+    }
   }
-}
-export function saveState(st){
-  localStorage.setItem(KEY, JSON.stringify(st));
-}
 
-export function ensureUser(id){
-  const st = getState();
-  if(!st.users[id]){
-    st.users[id] = {
-      progress:{},
-      points:0,
-      icon:null
+  function _saveRoot(root) {
+    localStorage.setItem(NS, JSON.stringify(root));
+  }
+
+  function getTodayLocal() {
+    // R-4-4/R-5-3: 端末ローカル YYYY-MM-DD（UTC禁止）
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function ensureUser(userId) {
+    const root = _loadRoot();
+    if (!root.users[userId]) root.users[userId] = DEFAULT_USER();
+    _saveRoot(root);
+  }
+
+  function setCurrentUser(userId) {
+    const root = _loadRoot();
+    if (!root.users[userId]) root.users[userId] = DEFAULT_USER();
+    root.currentUserId = userId;
+    _saveRoot(root);
+  }
+
+  function getCurrentUserId() {
+    return _loadRoot().currentUserId || "";
+  }
+
+  function getUser(userId) {
+    const root = _loadRoot();
+    if (!root.users[userId]) {
+      root.users[userId] = DEFAULT_USER();
+      _saveRoot(root);
+    }
+    return structuredClone(root.users[userId]);
+  }
+
+  function setUser(userId, userData) {
+    const root = _loadRoot();
+    root.users[userId] = userData;
+    _saveRoot(root);
+  }
+
+  function getPoints(userId) {
+    return getUser(userId).points || 0;
+  }
+
+  function addPoint(userId, delta) {
+    const u = getUser(userId);
+    u.points = Math.max(0, (u.points || 0) + delta);
+    setUser(userId, u);
+    return u.points;
+  }
+
+  function getAvatar(userId) {
+    return getUser(userId).settings?.avatarDataUrl || "";
+  }
+
+  function setAvatar(userId, dataUrl) {
+    const u = getUser(userId);
+    u.settings ||= {};
+    u.settings.avatarDataUrl = dataUrl || "";
+    setUser(userId, u);
+  }
+
+  function getSettings(userId) {
+    return getUser(userId).settings || DEFAULT_USER().settings;
+  }
+
+  function setSettings(userId, patch) {
+    const u = getUser(userId);
+    u.settings ||= {};
+    Object.assign(u.settings, patch || {});
+    setUser(userId, u);
+    return u.settings;
+  }
+
+  function makeWordId(game, word_key) {
+    // R-4-2: {game}:{word_key}
+    return `${game}:${word_key}`;
+  }
+
+  function getProgress(userId) {
+    return getUser(userId).progress || {};
+  }
+
+  function getWordProgress(userId, wordId) {
+    const p = getProgress(userId)[wordId];
+    if (!p) return null;
+    // R-9-4: 翌日自然リセット（wrong_today_dateが今日でなければ解除扱い）
+    const today = getTodayLocal();
+    if (p.wrong_today && p.wrong_today_date && p.wrong_today_date !== today) {
+      const u = getUser(userId);
+      const np = u.progress?.[wordId];
+      if (np) {
+        np.wrong_today = false;
+        np.wrong_today_date = "";
+        u.progress[wordId] = np;
+        setUser(userId, u);
+        return structuredClone(np);
+      }
+    }
+    return structuredClone(p);
+  }
+
+  function enrollWord(userId, wordId) {
+    // R-5-3: Enroll時 stage=0 due=today enrolled_at=today
+    const u = getUser(userId);
+    u.progress ||= {};
+    const today = getTodayLocal();
+    u.progress[wordId] = {
+      enrolled_at: today,
+      stage: 0,
+      due: today,
+      wrong_today: false,
+      wrong_today_date: ""
     };
-    saveState(st);
+    setUser(userId, u);
   }
-}
 
-export function setCurrentUser(id){
-  const st = getState();
-  st.currentUserId = id;
-  ensureUser(id);
-  saveState(st);
-}
+  function unenrollWord(userId, wordId) {
+    // R-5-3: progress削除
+    const u = getUser(userId);
+    if (u.progress && u.progress[wordId]) {
+      delete u.progress[wordId];
+      setUser(userId, u);
+    }
+  }
 
-export function getUser(uid){
-  const st = getState();
-  return st.users[uid] || null;
-}
+  function setWordProgress(userId, wordId, nextProgress) {
+    const u = getUser(userId);
+    u.progress ||= {};
+    u.progress[wordId] = nextProgress;
+    setUser(userId, u);
+  }
 
-export function getProgress(uid,wid){
-  const st = getState();
-  return st.users[uid]?.progress[wid] || null;
-}
+  function listEnrolledDueWordIds(userId, today) {
+    // R-9-2: due<=today && progressあり
+    const u = getUser(userId);
+    const p = u.progress || {};
+    const out = [];
+    for (const [wordId, pr] of Object.entries(p)) {
+      const due = pr?.due || "9999-12-31";
+      const wrong = !!pr?.wrong_today;
+      const wrongDate = pr?.wrong_today_date || "";
+      const dueOk = due <= today;
+      const wrongOk = wrong && wrongDate === today;
+      if (dueOk || wrongOk) out.push(wordId);
+    }
+    return out;
+  }
 
-export function setProgress(uid,wid,data){
-  const st = getState();
-  st.users[uid].progress[wid] = { ...st.users[uid].progress[wid], ...data };
-  saveState(st);
-}
+  function incrementCorrectAndMaybePoint(userId) {
+    // R-6-1: 10問○ごとに1ポイント（復習のみで呼ぶ）
+    const u = getUser(userId);
+    u.correct_mod10 = (u.correct_mod10 || 0) + 1;
+    let gained = 0;
+    if (u.correct_mod10 >= 10) {
+      u.correct_mod10 = u.correct_mod10 % 10;
+      u.points = (u.points || 0) + 1;
+      gained = 1;
+    }
+    setUser(userId, u);
+    return { points: u.points || 0, gained };
+  }
 
-export function deleteProgress(uid,wid){
-  const st = getState();
-  delete st.users[uid].progress[wid];
-  saveState(st);
-}
+  function resetPoints(userId) {
+    const u = getUser(userId);
+    u.points = 0;
+    u.correct_mod10 = 0;
+    setUser(userId, u);
+  }
 
-export function addPoint(uid){
-  const st = getState();
-  st.users[uid].points = (st.users[uid].points || 0) + 1;
-  saveState(st);
-  return st.users[uid].points;
-}
+  function resetLearningKeepAvatar(userId) {
+    const u = getUser(userId);
+    const avatar = u.settings?.avatarDataUrl || "";
+    const settings = u.settings || DEFAULT_USER().settings;
+    u.progress = {};
+    u.correct_mod10 = 0;
+    u.points = 0;
+    u.settings = { ...DEFAULT_USER().settings, ...settings, avatarDataUrl: avatar };
+    setUser(userId, u);
+  }
 
-export function getPoints(uid){
-  return getState().users[uid]?.points || 0;
-}
+  function exportCurrentUserBackup(userId) {
+    // R-11-2: 現在ユーザーのみJSON
+    const u = getUser(userId);
+    return {
+      version: "v2025-01",
+      userId,
+      data: u
+    };
+  }
 
-/* settings */
-export function getSeVolume(){
-  return getState().settings.seVolume ?? 0.9;
-}
-export function setSeVolume(v){
-  const st = getState();
-  st.settings.seVolume = Math.max(0, Math.min(1, Number(v)));
-  saveState(st);
-}
+  function importCurrentUserBackup(userId, backupObj) {
+    // R-11-2: 上書き（アバター保持）
+    const current = getUser(userId);
+    const keepAvatar = current.settings?.avatarDataUrl || "";
+    const next = backupObj?.data && typeof backupObj.data === "object" ? backupObj.data : DEFAULT_USER();
+    next.settings ||= DEFAULT_USER().settings;
+    next.settings.avatarDataUrl = keepAvatar;
+    setUser(userId, next);
+  }
 
-export function getPin(){
-  return String(getState().settings.pin || "1234");
-}
-export function setPin(pin4){
-  const st = getState();
-  st.settings.pin = String(pin4 || "").slice(0,4);
-  saveState(st);
-}
-
-/* backup/restore current user only */
-export function exportCurrentUser(){
-  const st = getState();
-  const uid = st.currentUserId;
-  if(!uid) return null;
-  return {
-    version: "v2025-01b",
-    exported_at: new Date().toISOString(),
-    user_id: uid,
-    user: st.users[uid],
-    settings: { seVolume: st.settings.seVolume }
+  window.AppStorage = {
+    getTodayLocal,
+    ensureUser,
+    setCurrentUser,
+    getCurrentUserId,
+    getUser,
+    setUser,
+    getPoints,
+    addPoint,
+    getAvatar,
+    setAvatar,
+    getSettings,
+    setSettings,
+    makeWordId,
+    getProgress,
+    getWordProgress,
+    enrollWord,
+    unenrollWord,
+    setWordProgress,
+    listEnrolledDueWordIds,
+    incrementCorrectAndMaybePoint,
+    resetPoints,
+    resetLearningKeepAvatar,
+    exportCurrentUserBackup,
+    importCurrentUserBackup
   };
-}
-
-export function importCurrentUser(obj){
-  const st = getState();
-  const uid = st.currentUserId;
-  if(!uid) return;
-  if(!obj || !obj.user) return;
-
-  // 上書き（ただしアバター保持は要件なので、iconだけは残す）
-  const keepIcon = st.users[uid]?.icon ?? null;
-  st.users[uid] = obj.user;
-  st.users[uid].icon = keepIcon;
-
-  // 音量だけは受け取る（任意）
-  if (obj.settings && typeof obj.settings.seVolume === "number") {
-    st.settings.seVolume = obj.settings.seVolume;
-  }
-
-  saveState(st);
-}
-
-export function setUserIcon(uid, dataUrl){
-  const st = getState();
-  st.users[uid].icon = dataUrl || null;
-  saveState(st);
-}
-
-export function resetPointsCurrent(){
-  const st = getState();
-  const uid = st.currentUserId;
-  if(!uid) return;
-  st.users[uid].points = 0;
-  saveState(st);
-}
-
-export function resetLearningCurrentKeepAvatar(){
-  const st = getState();
-  const uid = st.currentUserId;
-  if(!uid) return;
-  const keepIcon = st.users[uid]?.icon ?? null;
-  st.users[uid] = { progress:{}, points:0, icon: keepIcon };
-  saveState(st);
-}
+})();
