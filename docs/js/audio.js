@@ -1,56 +1,30 @@
-import { getUISettings } from "./storage.js";
+// TapSpeak Kids Vocab
+// Version: v2025-01
 
-const SFX = {
-  speak_start: "./assets/sounds/ui/speak_start.mp3",
-  correct: "./assets/sounds/ui/correct.mp3",
-  wrong: "./assets/sounds/ui/wrong.mp3",
-  point: "./assets/sounds/ui/point.mp3",
+let volume = 1;
+const sounds = {
+  correct:new Audio("./assets/sounds/ui/correct.mp3"),
+  wrong:new Audio("./assets/sounds/ui/wrong.mp3"),
+  point:new Audio("./assets/sounds/ui/point.mp3"),
+  speak_start:new Audio("./assets/sounds/ui/speak_start.mp3"),
 };
 
-let currentAudio = null;
-
-export function playSfx(name) {
-  const src = SFX[name];
-  if (!src) return;
-
-  const { seVolume } = getUISettings();
-
-  try {
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
-    }
-    const a = new Audio(src);
-    a.volume = Math.max(0, Math.min(1, Number(seVolume ?? 0.8)));
-    currentAudio = a;
-    a.play().catch(()=>{});
-  } catch {}
+export function setVolume(v){
+  volume = v;
+  Object.values(sounds).forEach(a=>a.volume=v);
 }
 
-export function speakTTS(text) {
-  if (!text) return;
-  try {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "en-US";
-    u.rate = 0.95;
-    u.pitch = 1.0;
-    window.speechSynthesis.speak(u);
-  } catch {}
+export function playSfx(name){
+  const a = sounds[name];
+  if(!a) return;
+  a.currentTime = 0;
+  a.volume = volume;
+  a.play();
 }
 
-export function lockWhileSpeaking(onLocked) {
-  // Safariで完璧な検知は難しいので最小限
-  try {
-    if (!("speechSynthesis" in window)) return;
-    onLocked(true);
-    const check = setInterval(() => {
-      if (!speechSynthesis.speaking) {
-        clearInterval(check);
-        onLocked(false);
-      }
-    }, 120);
-  } catch {
-    onLocked(false);
-  }
+export function speakTTS(text){
+  if(!text) return;
+  const u = new SpeechSynthesisUtterance(text);
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
 }
