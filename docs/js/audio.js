@@ -1,3 +1,5 @@
+import { getSfxVolume } from "./storage.js";
+
 const SFX_BASE = "./assets/sounds/ui/";
 
 const SFX = {
@@ -10,7 +12,6 @@ const SFX = {
 let currentSfxAudio = null;
 
 export function stopAllAudio() {
-  // 効果音（重ね再生禁止）
   if (currentSfxAudio) {
     try {
       currentSfxAudio.pause();
@@ -18,7 +19,6 @@ export function stopAllAudio() {
     } catch {}
     currentSfxAudio = null;
   }
-  // TTS
   try {
     window.speechSynthesis?.cancel();
   } catch {}
@@ -28,7 +28,6 @@ export function playSfx(name) {
   const file = SFX[name];
   if (!file) return;
 
-  // 重ね再生禁止：常に止めてから鳴らす
   if (currentSfxAudio) {
     try {
       currentSfxAudio.pause();
@@ -38,15 +37,19 @@ export function playSfx(name) {
   }
 
   const a = new Audio(SFX_BASE + file);
+  a.volume = getSfxVolume();
   currentSfxAudio = a;
+
   a.addEventListener("ended", () => {
     if (currentSfxAudio === a) currentSfxAudio = null;
   });
+
   a.play().catch(() => {
-    // iOSはユーザー操作なしの再生が制限される。ここでは黙る。
+    // iOS制限などは黙る
   });
 }
 
+/* ===== TTS ===== */
 export function speakTTS(text) {
   const t = (text || "").trim();
   if (!t) return;
@@ -62,7 +65,50 @@ export function speakTTS(text) {
 
   try {
     window.speechSynthesis.speak(u);
-  } catch {
-    // だめなら黙る
-  }
+  } catch {}
+}
+
+/* ===== TTS（完了待ち）: 復習モード用 ===== */
+export function speakTTSWait(text) {
+  const t = (text || "").trim();
+  if (!t) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {}
+
+    const u = new SpeechSynthesisUtterance(t);
+    u.lang = "en-US";
+    u.rate = 0.95;
+    u.pitch = 1.0;
+
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+
+    u.onend = finish;
+    u.onerror = finish;
+
+    // iOSでonendが飛ばない保険（長すぎない）
+    const fallbackMs = Math.min(5000, Math.max(1200, t.length * 70));
+    const timer = setTimeout(finish, fallbackMs);
+
+    const origFinish = finish;
+    const finishWrap = () => {
+      clearTimeout(timer);
+      origFinish();
+    };
+    u.onend = finishWrap;
+    u.onerror = finishWrap;
+
+    try {
+      window.speechSynthesis.speak(u);
+    } catch {
+      finishWrap();
+    }
+  });
 }
