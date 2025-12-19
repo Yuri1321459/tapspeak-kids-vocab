@@ -4,9 +4,21 @@ export async function loadWords(url) {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("words load fail");
   const data = await res.json();
-  if (!Array.isArray(data)) throw new Error("words must be array");
+
+  // 受け入れる形式：
+  // A) [ {...}, {...} ]
+  // B) { words: [ {...}, {...} ], version, generated_at }
+  let arr = null;
+  if (Array.isArray(data)) {
+    arr = data;
+  } else if (data && Array.isArray(data.words)) {
+    arr = data.words;
+  } else {
+    throw new Error("words.json format invalid");
+  }
+
   // enabled true only
-  return data.filter(x => x && x.enabled === true);
+  return arr.filter(x => x && x.enabled === true);
 }
 
 export function buildCategoryIndex(words) {
@@ -160,7 +172,6 @@ export function renderWordsScreen({
       const titleEl = card.querySelector(".wtitle");
       let revealed = false;
 
-      // reveal on tap image/title area (not a separate sound)
       card.querySelector(".thumb").addEventListener("click", () => {
         revealed = !revealed;
         if (revealed) {
@@ -180,7 +191,6 @@ export function renderWordsScreen({
         speakTTS(w.word);
       });
 
-      // Enroll: 初めて「おぼえた」 / 「わすれた」→再度「おぼえた」
       card.querySelector('[data-act="remember"]').addEventListener("click", () => {
         const t = todayStr();
         const newP = { stage: 0, due: t };
@@ -190,7 +200,6 @@ export function renderWordsScreen({
       });
 
       card.querySelector('[data-act="forget"]').addEventListener("click", () => {
-        // ふくしゅう から はずす（仕様：わすれた→再度おぼえたでEnroll）
         deleteProgress(userId, id);
         playSfx("point");
         renderList();
@@ -215,7 +224,6 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
-// review.js から使う
 export function calcNextDue(todayStr, stage) {
   return nextDueFromStage(todayStr, stage);
 }
