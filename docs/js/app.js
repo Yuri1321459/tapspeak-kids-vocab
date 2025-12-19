@@ -1,493 +1,315 @@
-import { loadWords, buildCategoryIndex } from "./words.js";
-import { getState, setCurrentUserId, ensureUser, getUsers, getAvatarDataUrl } from "./storage.js";
-import { renderWordsScreen } from "./words.js";
+import { loadWords, buildCategoryIndex, renderWordsScreen } from "./words.js";
 import { renderReviewScreen } from "./review.js";
-import { stopAllAudio } from "./audio.js";
+import {
+  getDB, getState, setCurrentUser, getUser, listUsers,
+  getTodayStr, resetWrongToday, setUserIconDataUrl, getUISettings, setSeVolume
+} from "./storage.js";
 
-const appEl = document.getElementById("app");
+const app = document.getElementById("app");
 
 let WORDS = [];
-let CAT = null;
+let CATIDX = null;
 
-const ROUTES = {
-  select: renderUserSelect,
-  home: renderHome,
-  words: renderWords,
-  review: renderReview,
-  settings: renderSettings,
-};
-
-function routeFromHash() {
-  const h = (location.hash || "#/select").replace("#", "");
-  const parts = h.split("/").filter(Boolean);
-  return { name: parts[0] || "select", args: parts.slice(1) };
-}
-
-function go(name, ...args) {
-  location.hash = `#/${name}${args.length ? "/" + args.join("/") : ""}`;
-}
-
-function el(html) {
+function el(html){
   const t = document.createElement("template");
   t.innerHTML = html.trim();
   return t.content.firstElementChild;
 }
 
-function userLetter(userId, userLabel) {
-  if (userId === "riona") return "R";
-  if (userId === "soma") return "S";
-  if (userId === "developer") return "D";
-  // fallback: first char
-  return (userLabel || "?").slice(0, 1).toUpperCase();
+function clearApp(){
+  app.innerHTML = "";
 }
 
-function topBar({ showPoints, rightUserSwitch }) {
-  const st = getState();
-  const user = st.currentUserId ? ensureUser(st.currentUserId) : null;
-
-  const left = showPoints
-    ? `<div class="badge" id="badgePoints" aria-label="points"><span class="star">⭐</span><strong>${user?.points ?? 0}</strong></div>`
-    : `<div></div>`;
-
-  let right = `<div></div>`;
-  if (rightUserSwitch && user) {
-    const ava = getAvatarDataUrl(user.id);
-    const letter = userLetter(user.id, user.label);
-    right = `
-      <button class="iconbtn" id="btnUserSwitch" type="button" aria-label="user">
-        ${ava ? `<img class="avatarImg" alt="" src="${ava}" />` : `<span class="avatarCircle" aria-hidden="true">${letter}</span>`}
-        <span>${user.label}</span>
-      </button>
-    `;
-  }
-
-  return `<div class="topbar">${left}${right}</div>`;
+function mount(node){
+  clearApp();
+  app.appendChild(node);
 }
 
-function mount(node) {
-  stopAllAudio();
-  appEl.innerHTML = "";
-  appEl.appendChild(node);
-}
-
-async function ensureData() {
-  if (WORDS.length) return;
-  WORDS = await loadWords("./data/words.json");
-  CAT = buildCategoryIndex(WORDS);
-}
-
-function todayStr() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function dueCountForUser(userId) {
-  const st = getState();
-  const u = ensureUser(userId);
-  const prog = st.progressByUser?.[u.id] || {};
-  const t = todayStr();
-  let n = 0;
-
-  for (const w of WORDS) {
-    if (!w.enabled) continue;
-    const id = `${w.game}:${w.word_key}`;
-    const p = prog[id];
-    if (!p) continue;
-    if ((p.due || "") <= t) n++;
-  }
-
-  // 今日中に○まで出すフラグも対象
-  const wrongToday = st.wrongTodayByUser?.[u.id];
-  if (wrongToday?.date === t) {
-    for (const id of Object.keys(wrongToday.map || {})) {
-      const w = WORDS.find(x => `${x.game}:${x.word_key}` === id);
-      if (!w || !w.enabled) continue;
-      const p = prog[id];
-      if (!p || (p.due || "") > t) n++;
-    }
-  }
-
-  return n;
-}
-
-/* =========================
-   画面：ユーザー選択
-========================= */
-function renderUserSelect() {
-  const users = getUsers();
-
-  const riona = users.find(u => u.id === "riona") || ensureUser("riona", "りおな");
-  const soma = users.find(u => u.id === "soma") || ensureUser("soma", "そうま");
-
-  const node = el(`
-    <div class="center">
-      <div class="screen">
-        <div class="h1">TapSpeak Vocab</div>
-        <div class="hr"></div>
-
-        <button class="bigbtn" id="btnRiona" type="button">
-          <span class="avatarCircle" aria-hidden="true">R</span>
-          <span>${riona.label}</span>
-        </button>
-
-        <button class="bigbtn" id="btnSoma" type="button">
-          <span class="avatarCircle" aria-hidden="true">S</span>
-          <span>${soma.label}</span>
-        </button>
-
-        <div class="footerlink">
-          <button id="btnDev" type="button">開発者用</button>
-        </div>
+function headerFixed({ onHome, onUserSwitch }) {
+  const h = el(`
+    <div class="headerFixed">
+      <div class="headerInner">
+        <div class="row between" id="row1"></div>
+        <div class="row between" id="row2" style="margin-top:8px"></div>
       </div>
     </div>
   `);
 
-  node.querySelector("#btnRiona").addEventListener("click", () => {
-    setCurrentUserId("riona");
-    go("home");
-  });
+  const row1 = h.querySelector("#row1");
+  const row2 = h.querySelector("#row2");
 
-  node.querySelector("#btnSoma").addEventListener("click", () => {
-    setCurrentUserId("soma");
-    go("home");
-  });
+  const left = el(`<button class="iconBtn" type="button" aria-label="home">🏠</button>`);
+  left.addEventListener("click", onHome);
 
-  node.querySelector("#btnDev").addEventListener("click", () => {
-    ensureUser("developer", "開発者");
-    setCurrentUserId("developer");
-    go("home");
-  });
+  const points = el(`<div class="pill"><span>⭐</span><span id="pointsNum">0</span></div>`);
+  const userChip = el(`<button class="userChip" type="button" id="userChip"></button>`);
+  userChip.addEventListener("click", onUserSwitch);
 
-  mount(node);
-}
+  row1.appendChild(el(`<div class="row" style="gap:10px"></div>`));
+  row1.firstElementChild.appendChild(left);
+  row1.firstElementChild.appendChild(points);
+  row1.appendChild(userChip);
 
-/* =========================
-   画面：ホーム
-========================= */
-function renderHome() {
-  const st = getState();
-  if (!st.currentUserId) return go("select");
+  function updateUserChip(){
+    const st = getState();
+    const u = getUser(st.currentUserId);
+    if (!u) { userChip.textContent = ""; return; }
+    userChip.textContent = u.name;
+    points.querySelector("#pointsNum").textContent = String(u.points ?? 0);
+  }
 
-  const user = ensureUser(st.currentUserId);
-  const due = dueCountForUser(user.id);
+  function setSecondRow({ mode, catDropEl, stageDropEl, onGoHome, onGoReview, onGoWords }) {
+    row2.innerHTML = "";
 
-  const node = el(`
-    <div class="center">
-      ${topBar({ showPoints: true, rightUserSwitch: true })}
-      <div class="screen">
-        <div class="center" style="min-height:auto">
-          <button class="bigbtn blue" id="btnWords" type="button">たんご</button>
-          <button class="bigbtn gray" id="btnReview" type="button">ふくしゅう：${due}こ</button>
-          <div class="smallbottom">
-            <button id="btnSettings" type="button">設定</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `);
+    // 2行目：たんご/ふくしゅう ちょっと離す
+    const tabs = el(`<div class="row" style="gap:14px"></div>`);
+    const tWords = el(`<button class="tabBtn ${mode==="words"?"active":""}" type="button">たんご</button>`);
+    const tReview = el(`<button class="tabBtn ${mode==="review"?"active review":"review"}" type="button">ふくしゅう</button>`);
 
-  const btnSwitch = node.querySelector("#btnUserSwitch");
-  if (btnSwitch) btnSwitch.addEventListener("click", () => go("select"));
-
-  node.querySelector("#btnWords").addEventListener("click", () => go("words"));
-  node.querySelector("#btnReview").addEventListener("click", () => go("review"));
-  node.querySelector("#btnSettings").addEventListener("click", () => go("settings"));
-
-  mount(node);
-}
-
-/* =========================
-   画面：たんご
-========================= */
-function renderWords() {
-  const st = getState();
-  if (!st.currentUserId) return go("select");
-
-  const node = renderWordsScreen({
-    words: WORDS,
-    categoryIndex: CAT,
-    onGoHome: () => go("home"),
-    onGoReview: () => go("review"),
-    onGoSelect: () => go("select"),
-    topBarHtml: topBar({ showPoints: true, rightUserSwitch: true }),
-    onUserSwitch: () => go("select"),
-    todayStr,
-  });
-
-  mount(node);
-}
-
-/* =========================
-   画面：ふくしゅう
-========================= */
-function renderReview() {
-  const st = getState();
-  if (!st.currentUserId) return go("select");
-
-  const node = renderReviewScreen({
-    words: WORDS,
-    categoryIndex: CAT,
-    onGoHome: () => go("home"),
-    onGoWords: () => go("words"),
-    onGoSelect: () => go("select"),
-    topBarHtml: topBar({ showPoints: true, rightUserSwitch: true }),
-    onUserSwitch: () => go("select"),
-    todayStr,
-    // ポイント演出をトップレベルで出す
-    onPointGained: () => {
-      showPointEffect();
-      // 左上バッジもキラッ
-      const badge = document.getElementById("badgePoints");
-      if (badge) {
-        badge.classList.remove("sparkle");
-        // reflow
-        void badge.offsetWidth;
-        badge.classList.add("sparkle");
-      }
-    }
-  });
-
-  mount(node);
-}
-
-/* =========================
-   画面：設定
-========================= */
-function renderSettings() {
-  const st = getState();
-  if (!st.currentUserId) return go("select");
-  const user = ensureUser(st.currentUserId);
-
-  const node = el(`
-    <div>
-      ${topBar({ showPoints: true, rightUserSwitch: true })}
-      <div class="screen">
-        <div class="row" style="justify-content:space-between;align-items:center">
-          <div>
-            <div class="h1" style="margin:0">設定</div>
-          </div>
-          <button class="iconbtn" id="btnBack" type="button">戻る</button>
-        </div>
-
-        <div class="hr"></div>
-
-        <div class="sectiontitle">利用者画像</div>
-        <div class="row" style="align-items:center">
-          <img id="avatarPreview" alt="" style="width:64px;height:64px;border-radius:999px;object-fit:cover;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06)" src="${getAvatarDataUrl(user.id) || ""}" onerror="this.style.display='none'"/>
-          <div class="pill">
-            <input id="avatarFile" type="file" accept="image/*" />
-          </div>
-        </div>
-        <div class="note">※ 暗証番号不要</div>
-
-        <div class="hr"></div>
-
-        <div class="sectiontitle">効果音音量</div>
-        <div class="field">
-          <label>音量</label>
-          <input class="input" id="sfxRange" type="range" min="0" max="100" step="1" />
-          <div class="note">※ 効果音のみ</div>
-        </div>
-
-        <div class="hr"></div>
-
-        <div class="sectiontitle">保存</div>
-        <div class="actions">
-          <button class="btn blue" id="btnExport" type="button">バックアップ作成</button>
-          <button class="btn" id="btnImportPick" type="button">バックアップ読込</button>
-          <input id="importFile" type="file" accept="application/json" style="display:none" />
-        </div>
-        <div class="note">※ 読込時上書</div>
-
-        <div class="hr"></div>
-
-        <div class="sectiontitle">暗証番号</div>
-        <div class="field">
-          <label>暗証番号</label>
-          <input class="input" id="pinValue" type="password" inputmode="numeric" placeholder="数字 4桁 等" />
-          <button class="btn" id="btnSetPin" type="button">暗証番号保存</button>
-          <div class="note">※ リセット時必要</div>
-        </div>
-
-        <div class="hr"></div>
-
-        <div class="sectiontitle">初期化</div>
-        <div class="actions">
-          <button class="btn ng" id="btnResetPoints" type="button">ポイント初期化</button>
-          <button class="btn ng" id="btnResetAll" type="button">学習全初期化</button>
-        </div>
-        <div class="note">※ 画像保持</div>
-
-      </div>
-    </div>
-  `);
-
-  const btnSwitch = node.querySelector("#btnUserSwitch");
-  if (btnSwitch) btnSwitch.addEventListener("click", () => go("select"));
-
-  node.querySelector("#btnBack").addEventListener("click", () => go("home"));
-
-  // SFX volume
-  import("./storage.js").then(({ getSfxVolume, setSfxVolume }) => {
-    const r = node.querySelector("#sfxRange");
-    r.value = String(Math.round(getSfxVolume() * 100));
-    r.addEventListener("input", () => {
-      setSfxVolume(Number(r.value) / 100);
+    tWords.addEventListener("click", () => {
+      if (mode === "words") return;
+      onGoWords?.();
     });
-  });
+    tReview.addEventListener("click", () => {
+      if (mode === "review") return;
+      onGoReview?.();
+    });
 
-  // avatar
-  const file = node.querySelector("#avatarFile");
-  file.addEventListener("change", async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const dataUrl = await fileToDataUrl(f);
-    const st2 = getState();
-    const u = ensureUser(st2.currentUserId);
-    const { setAvatarDataUrl } = await import("./storage.js");
-    setAvatarDataUrl(u.id, dataUrl);
-    const img = node.querySelector("#avatarPreview");
-    img.style.display = "block";
-    img.src = dataUrl;
-  });
+    tabs.appendChild(tWords);
+    tabs.appendChild(tReview);
 
-  // export
-  node.querySelector("#btnExport").addEventListener("click", async () => {
-    const { exportBackupJson } = await import("./storage.js");
-    const json = exportBackupJson();
-    downloadText(`tapspeak_backup_${todayStr()}.json`, json);
-  });
+    // フィルタ列
+    const filters = el(`<div class="rowWrap" style="justify-content:flex-end"></div>`);
+    if (catDropEl) filters.appendChild(catDropEl);
+    if (stageDropEl) filters.appendChild(stageDropEl);
 
-  // import
-  const importPick = node.querySelector("#btnImportPick");
-  const importInput = node.querySelector("#importFile");
-  importPick.addEventListener("click", () => importInput.click());
-  importInput.addEventListener("change", async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const text = await f.text();
-    const { importBackupJson } = await import("./storage.js");
-    try {
-      importBackupJson(text);
-      go("home");
-    } catch {
-      alert("読込失敗");
+    row2.appendChild(tabs);
+    row2.appendChild(filters);
+  }
+
+  return { el: h, updateUserChip, setSecondRow };
+}
+
+/* ===== 画面 ===== */
+function showUserSelect(){
+  const users = listUsers().filter(u => ["riona","soma","dev"].includes(u.id));
+  const root = el(`
+    <div class="userSelect">
+      <div class="userGrid" id="grid"></div>
+      <div class="devLink"><button type="button" id="devLink">開発者用</button></div>
+    </div>
+  `);
+
+  const grid = root.querySelector("#grid");
+
+  function makeAvatar(u){
+    const av = document.createElement("div");
+    av.className = "userAvatar";
+    if (u.iconDataUrl) {
+      const img = document.createElement("img");
+      img.src = u.iconDataUrl;
+      img.alt = "";
+      av.appendChild(img);
+    } else {
+      av.textContent = u.initial || "U";
     }
-  });
-
-  // pin set
-  node.querySelector("#btnSetPin").addEventListener("click", async () => {
-    const v = node.querySelector("#pinValue").value.trim();
-    const { setPin } = await import("./storage.js");
-    setPin(v);
-  });
-
-  // reset with pin
-  node.querySelector("#btnResetPoints").addEventListener("click", async () => {
-    const ok = await askPin();
-    if (!ok) return;
-    const { resetPoints } = await import("./storage.js");
-    resetPoints(user.id);
-    go("home");
-  });
-
-  node.querySelector("#btnResetAll").addEventListener("click", async () => {
-    const ok = await askPin();
-    if (!ok) return;
-    const { resetLearningKeepAvatar } = await import("./storage.js");
-    resetLearningKeepAvatar(user.id);
-    go("home");
-  });
-
-  mount(node);
-}
-
-async function askPin() {
-  const { getPin } = await import("./storage.js");
-  const pin = getPin();
-  if (!pin) {
-    alert("暗証番号保存後実行");
-    return false;
+    return av;
   }
-  const input = prompt("暗証番号入力");
-  if ((input || "").trim() !== pin) {
-    alert("不一致");
-    return false;
+
+  for (const u of users.filter(x => x.id !== "dev")) {
+    const b = el(`<button class="userBtn" type="button"></button>`);
+    b.appendChild(makeAvatar(u));
+    b.appendChild(el(`<div class="userName">${u.name}</div>`));
+    b.addEventListener("click", () => {
+      setCurrentUser(u.id);
+      resetWrongToday(u.id); // 翌日リセット想定（軽く保険）
+      showHome();
+    });
+    grid.appendChild(b);
   }
-  return true;
+
+  // 開発者
+  root.querySelector("#devLink").addEventListener("click", () => {
+    setCurrentUser("dev");
+    showHome();
+  });
+
+  mount(root);
 }
 
-function downloadText(filename, text) {
-  const blob = new Blob([text], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+function showHome(){
+  const st = getState();
+  const u = getUser(st.currentUserId);
+  if (!u) return showUserSelect();
+
+  const header = headerFixed({
+    onHome: () => showHome(),
+    onUserSwitch: () => showUserSelect(),
+  });
+
+  const root = el(`
+    <div>
+      <div id="headerHost"></div>
+      <div class="screen">
+        <div class="card">
+          <div class="homeBtns">
+            <button class="bigBtn blue" id="btnWords" type="button">たんご</button>
+            <button class="bigBtn green" id="btnReview" type="button">ふくしゅう：<span id="dueN">0</span>こ</button>
+          </div>
+          <div style="margin-top:10px;text-align:center">
+            <button class="iconBtn" id="btnSettings" type="button">設定</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  root.querySelector("#headerHost").appendChild(header.el);
+  header.updateUserChip();
+
+  // 2行目はホームでは不要（空）
+  header.setSecondRow({ mode:"home" });
+
+  // due数計算
+  const today = getTodayStr();
+  let dueCount = 0;
+  const prog = u.progress || {};
+  for (const id of Object.keys(prog)) {
+    if (prog[id]?.due && prog[id].due <= today) dueCount++;
+  }
+  root.querySelector("#dueN").textContent = String(dueCount);
+
+  root.querySelector("#btnWords").addEventListener("click", () => showWords());
+  root.querySelector("#btnReview").addEventListener("click", () => showReview());
+  root.querySelector("#btnSettings").addEventListener("click", () => showSettings());
+
+  mount(root);
 }
 
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
+function showWords(){
+  const st = getState();
+  if (!st.currentUserId) return showUserSelect();
+
+  const header = headerFixed({
+    onHome: () => showHome(),
+    onUserSwitch: () => showUserSelect(),
+  });
+
+  const wrapper = el(`<div><div id="headerHost"></div></div>`);
+  wrapper.querySelector("#headerHost").appendChild(header.el);
+  header.updateUserChip();
+
+  const screen = renderWordsScreen({
+    words: WORDS,
+    categoryIndex: CATIDX,
+    headerHost: header,
+    onGoHome: () => showHome(),
+    onGoReview: () => showReview(),
+  });
+
+  wrapper.appendChild(screen);
+  mount(wrapper);
+  header.updateUserChip();
+}
+
+function showReview(){
+  const st = getState();
+  if (!st.currentUserId) return showUserSelect();
+
+  const header = headerFixed({
+    onHome: () => showHome(),
+    onUserSwitch: () => showUserSelect(),
+  });
+
+  const wrapper = el(`<div><div id="headerHost"></div></div>`);
+  wrapper.querySelector("#headerHost").appendChild(header.el);
+  header.updateUserChip();
+
+  const screen = renderReviewScreen({
+    words: WORDS,
+    categoryIndex: CATIDX,
+    headerHost: header,
+    onGoHome: () => showHome(),
+    onGoWords: () => showWords(),
+  });
+
+  wrapper.appendChild(screen);
+  mount(wrapper);
+  header.updateUserChip();
+}
+
+function showSettings(){
+  const st = getState();
+  const uid = st.currentUserId;
+  if (!uid) return showUserSelect();
+
+  const header = headerFixed({
+    onHome: () => showHome(),
+    onUserSwitch: () => showUserSelect(),
+  });
+
+  const u = getUser(uid);
+  const ui = getUISettings();
+
+  const root = el(`
+    <div>
+      <div id="headerHost"></div>
+      <div class="screen">
+        <div class="card settingsGrid">
+          <div class="field">
+            <label>効果音音量</label>
+            <input type="range" id="seVol" min="0" max="1" step="0.05" value="${ui.seVolume}">
+          </div>
+
+          <div class="field">
+            <label>ユーザーアイコン変更</label>
+            <input type="file" id="iconFile" accept="image/*">
+            <p class="notice">※ 端末から選んだ画像を保存します。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  root.querySelector("#headerHost").appendChild(header.el);
+  header.updateUserChip();
+  header.setSecondRow({ mode:"settings" });
+
+  root.querySelector("#seVol").addEventListener("input", (e) => {
+    setSeVolume(e.target.value);
+  });
+
+  root.querySelector("#iconFile").addEventListener("change", async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const dataUrl = await fileToDataURL(f);
+    setUserIconDataUrl(uid, dataUrl);
+    showHome();
+  });
+
+  mount(root);
+}
+
+async function fileToDataURL(file){
+  return new Promise((resolve,reject)=>{
     const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
+    r.onload = () => resolve(r.result);
     r.onerror = reject;
     r.readAsDataURL(file);
   });
 }
 
-/* ===== ポイント演出（即時） ===== */
-function showPointEffect() {
-  // 中央 +1
-  const p = document.createElement("div");
-  p.className = "popPoint";
-  p.textContent = "＋1";
-  document.body.appendChild(p);
-  setTimeout(() => p.remove(), 1300);
+/* ===== 起動 ===== */
+async function boot(){
+  getDB(); // init
+  WORDS = await loadWords("./data/words.json");
+  CATIDX = buildCategoryIndex(WORDS);
 
-  // キラキラ
-  const layer = document.createElement("div");
-  layer.className = "sparkLayer";
-  document.body.appendChild(layer);
-
-  const n = 18;
-  for (let i = 0; i < n; i++) {
-    const s = document.createElement("div");
-    s.className = "spark";
-    s.textContent = "✨";
-    const x = 40 + Math.random() * 20; // center around 50%
-    const y = 18 + Math.random() * 12; // around top 20-30%
-    s.style.left = `${x}%`;
-    s.style.top = `${y}%`;
-    s.style.animationDelay = `${Math.random() * 120}ms`;
-    layer.appendChild(s);
-  }
-  setTimeout(() => layer.remove(), 1100);
+  const st = getState();
+  if (!st.currentUserId) showUserSelect();
+  else showHome();
 }
 
-/* =========================
-   起動
-========================= */
-async function main() {
-  await ensureData();
-
-  ensureUser("riona", "りおな");
-  ensureUser("soma", "そうま");
-
-  const render = async () => {
-    const { name } = routeFromHash();
-    const fn = ROUTES[name] || ROUTES.select;
-    await ensureData();
-    fn();
-  };
-
-  window.addEventListener("hashchange", render);
-  await render();
-}
-
-main().catch(() => {
-  appEl.innerHTML = `<div class="screen"><div class="h1">えらー</div><div class="subtle">よみこみ に しっぱい しました</div></div>`;
+boot().catch(() => {
+  mount(el(`<div class="screen"><div class="card">よみこみ に しっぱい しました</div></div>`));
 });
