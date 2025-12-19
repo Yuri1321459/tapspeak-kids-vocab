@@ -1,13 +1,26 @@
+<!-- R-2-1: 単一HTML。余計なライブラリなし。 -->
 <!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
+  <!-- R-1-2: 相対パス運用／GitHub Pagesで壊れない -->
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>TapSpeak Vocab</title>
-  <link rel="stylesheet" href="./css/app.css?v=1.0.0">
+  <link rel="stylesheet" href="./css/app.css" />
 </head>
 <body>
+  <!-- R-2-1: ルート要素のみ -->
   <div id="app"></div>
-  <script type="module" src="./js/app.js?v=1.0.0"></script>
+
+  <!-- R-2-4: 永続化 -->
+  <script src="./js/storage.js"></script>
+  <!-- R-2-5: 音声 -->
+  <script src="./js/audio.js"></script>
+  <!-- R-2-6: たんご -->
+  <script src="./js/words.js"></script>
+  <!-- R-2-7: ふくしゅう -->
+  <script src="./js/review.js"></script>
+  <!-- R-2-3: 画面遷移・ヘッダ -->
+  <script src="./js/app.js"></script>
 </body>
 </html>
