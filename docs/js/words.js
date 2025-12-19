@@ -1,5 +1,5 @@
 import { ensureUser, getState, getProgress, setProgress, deleteProgress } from "./storage.js";
-import { playSfx, speakTTS } from "./review_deps_tmp.js"; // (※下で差し替え。importを使わない運用)
+import { playSfx, speakTTS } from "./audio.js";
 
 export async function loadWords(url) {
   const res = await fetch(url, { cache: "no-store" });
@@ -56,19 +56,7 @@ function sortWordsForList(words) {
   });
 }
 
-function nextDueFromStage(todayStr, stage) {
-  const days = [0, 1, 3, 7, 14, 30, 365][stage] ?? 0;
-  const d = new Date(todayStr + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,"0");
-  const day = String(d.getDate()).padStart(2,"0");
-  return `${y}-${m}-${day}`;
-}
-
-/* ===== フィルタ: ステージ表示用（UIは数値出さない） =====
-   まだ: stage 0-1（未Enrollも0扱い）
-*/
+/* ===== ステージグループ（UIは数値出さない） ===== */
 const STAGE_GROUPS = [
   { key: "mada", label: "まだ", test: (s) => s === 0 || s === 1 },
   { key: "sukoshi", label: "すこし", test: (s) => s === 2 },
@@ -79,7 +67,6 @@ const STAGE_GROUPS = [
 ];
 
 function makeMultiDrop({ title, allLabel, options, defaultAllSelected = true }) {
-  // options: [{key,label, sub?}]
   const wrap = document.createElement("div");
   wrap.className = "drop";
 
@@ -93,39 +80,15 @@ function makeMultiDrop({ title, allLabel, options, defaultAllSelected = true }) 
   panel.className = "dropPanel hidden";
   wrap.appendChild(panel);
 
-  const state = {
-    all: true,
-    selected: new Set(), // option keys
-  };
-
-  function setAll() {
-    state.all = true;
-    state.selected.clear();
-    syncUI();
-  }
-
-  function setSelected(keys) {
-    state.all = false;
-    state.selected = new Set(keys);
-    if (state.selected.size === 0 && defaultAllSelected) {
-      // fallback to all
-      setAll();
-      return;
-    }
-    syncUI();
-  }
+  const state = { all: true, selected: new Set() };
 
   function syncMini() {
     const mini = btn.querySelector("[data-mini]");
-    if (state.all) {
-      mini.textContent = allLabel;
-    } else {
-      mini.textContent = `${state.selected.size}選択`;
-    }
+    if (state.all) mini.textContent = allLabel;
+    else mini.textContent = `${state.selected.size}選択`;
   }
 
   function syncUI() {
-    // checkboxes
     panel.querySelectorAll('input[type="checkbox"][data-key]').forEach((cb) => {
       const key = cb.dataset.key;
       cb.checked = state.all ? false : state.selected.has(key);
@@ -135,14 +98,15 @@ function makeMultiDrop({ title, allLabel, options, defaultAllSelected = true }) 
     syncMini();
   }
 
-  function close() {
-    panel.classList.add("hidden");
-  }
-  function toggle() {
-    panel.classList.toggle("hidden");
+  function setAll() {
+    state.all = true;
+    state.selected.clear();
+    syncUI();
   }
 
-  // build panel
+  function close() { panel.classList.add("hidden"); }
+  function toggle() { panel.classList.toggle("hidden"); }
+
   panel.appendChild(el(`
     <div class="dropItem" data-click="all">
       <input type="checkbox" data-all="1" />
@@ -152,50 +116,35 @@ function makeMultiDrop({ title, allLabel, options, defaultAllSelected = true }) 
   `));
 
   for (const opt of options) {
-    const sub = opt.sub ? `<small>${opt.sub}</small>` : `<small></small>`;
     const item = el(`
       <div class="dropItem" data-click="one">
         <input type="checkbox" data-key="${opt.key}" />
         <span>${opt.label}</span>
-        ${sub}
+        <small></small>
       </div>
     `);
     panel.appendChild(item);
   }
 
-  // interactions
-  btn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    toggle();
-  });
+  btn.addEventListener("click", (e) => { e.stopPropagation(); toggle(); });
 
   panel.addEventListener("click", (e) => {
     e.stopPropagation();
-
     const item = e.target.closest(".dropItem");
     if (!item) return;
 
     const allCb = item.querySelector('input[data-all="1"]');
-    if (allCb) {
-      setAll();
-      return;
-    }
+    if (allCb) { setAll(); return; }
 
     const cb = item.querySelector('input[data-key]');
     if (!cb) return;
-
     const key = cb.dataset.key;
 
-    // 複数選択: toggle
-    if (state.all) {
-      state.all = false;
-      state.selected.clear();
-    }
+    if (state.all) { state.all = false; state.selected.clear(); }
 
     if (state.selected.has(key)) state.selected.delete(key);
     else state.selected.add(key);
 
-    // ぜんかてごりは特別扱い（all）
     if (state.selected.size === 0 && defaultAllSelected) {
       setAll();
       return;
@@ -204,10 +153,7 @@ function makeMultiDrop({ title, allLabel, options, defaultAllSelected = true }) 
     syncUI();
   });
 
-  // close on outside
   document.addEventListener("click", () => close());
-
-  // initial
   if (defaultAllSelected) setAll();
   else syncUI();
 
@@ -215,8 +161,12 @@ function makeMultiDrop({ title, allLabel, options, defaultAllSelected = true }) 
     el: wrap,
     getState: () => ({ all: state.all, selected: new Set(state.selected) }),
     setAll,
-    setSelected,
-    close,
+    setSelected: (keys) => {
+      state.all = false;
+      state.selected = new Set(keys);
+      if (state.selected.size === 0 && defaultAllSelected) setAll();
+      else syncUI();
+    },
   };
 }
 
@@ -259,33 +209,30 @@ export function renderWordsScreen({
 
   const filtersRow = node.querySelector("#filtersRow");
 
-  // ===== カテゴリフィルタ（共通・複数）=====
+  // カテゴリ（複数）：初期は全分類
   const catOptions = categoryIndex.cats.map(c => ({
     key: c.id,
     label: `${c.label_ja}（${c.label_kana || ""}）`.replace("（）",""),
   }));
-
   const catDrop = makeMultiDrop({
     title: "分類",
     allLabel: "全分類",
     options: catOptions,
-    defaultAllSelected: true, // 初期: ぜんかてごり
+    defaultAllSelected: true,
   });
 
-  // ===== ステージフィルタ（単語モード専用）=====
+  // 段階（複数 OR）：デフォルト全選択（フィルタなし）
   const stageDrop = makeMultiDrop({
     title: "段階",
     allLabel: "全段階",
     options: STAGE_GROUPS.map(g => ({ key: g.key, label: g.label })),
     defaultAllSelected: false,
   });
-  // デフォルト: 全選択（=フィルタなし）
   stageDrop.setSelected(STAGE_GROUPS.map(g => g.key));
 
   const right = el(`<button class="iconbtn" id="btnHome" type="button">ほーむ</button>`);
   right.addEventListener("click", onGoHome);
 
-  // 配置
   const leftPack = document.createElement("div");
   leftPack.className = "row";
   leftPack.appendChild(catDrop.el);
@@ -303,32 +250,28 @@ export function renderWordsScreen({
     return Number.isFinite(p.stage) ? p.stage : 0;
   }
 
-  function stageGroupMatch(stage, groupKeySet) {
-    // OR条件（いずれかに該当）
+  function stageOk(word) {
+    const stageState = stageDrop.getState();
+    const selected = stageState.selected;
+
+    // 全選択=フィルタなし
+    if (selected.size === STAGE_GROUPS.length) return true;
+
+    const s = getStageForFilter(word);
     for (const g of STAGE_GROUPS) {
-      if (!groupKeySet.has(g.key)) continue;
-      if (g.test(stage)) return true;
+      if (!selected.has(g.key)) continue;
+      if (g.test(s)) return true;
     }
     return false;
   }
 
-  function filterWords() {
+  function catOk(word) {
     const catState = catDrop.getState();
-    const stageState = stageDrop.getState();
+    if (catState.all) return true;
+    return catState.selected.has(word.category_id);
+  }
 
-    const catOk = (w) => {
-      if (catState.all) return true;
-      return catState.selected.has(w.category_id);
-    };
-
-    const stageOk = (w) => {
-      // 全選択=フィルタなし扱い
-      const selected = stageState.selected;
-      if (selected.size === STAGE_GROUPS.length) return true;
-      const s = getStageForFilter(w);
-      return stageGroupMatch(s, selected);
-    };
-
+  function filterWords() {
     return sortWordsForList(words.filter(w => w.enabled && catOk(w) && stageOk(w)));
   }
 
@@ -344,9 +287,7 @@ export function renderWordsScreen({
       const card = el(`
         <div class="card">
           <div class="wordgrid">
-            <div class="thumbWrap" data-thumb="1">
-              <img class="thumb" alt="" src="${imgSrc(w)}" />
-            </div>
+            <div class="thumbWrap" data-thumb="1"></div>
             <div>
               <div class="descRow">
                 <button class="spkbtn" type="button" data-act="descSpeak" aria-label="speak">🔊</button>
@@ -355,7 +296,7 @@ export function renderWordsScreen({
             </div>
           </div>
 
-          <div class="actions" data-actions="1">
+          <div class="actions">
             ${enrolled
               ? `<button class="btn ng" data-act="forget" type="button">わすれた</button>`
               : `<button class="btn ok" data-act="remember" type="button">おぼえた</button>`
@@ -364,7 +305,7 @@ export function renderWordsScreen({
         </div>
       `);
 
-      // 画像タップ: 画像枠の中を「単語」に置換（オンオフ）
+      // 画像タップ：画像枠を「単語表示」に置換（オンオフ）
       const wrap = card.querySelector('[data-thumb="1"]');
       let showWord = false;
 
@@ -390,29 +331,27 @@ export function renderWordsScreen({
         setThumb();
       });
 
-      // 説明文読み上げ（スピーカーアイコン）
+      // 説明文読み上げ
       card.querySelector('[data-act="descSpeak"]').addEventListener("click", () => {
         speakTTS(w.desc_lv2 || "");
       });
 
-      // Enroll / Unenroll
-      const t = todayStr();
+      // Enroll
       const rememberBtn = card.querySelector('[data-act="remember"]');
       if (rememberBtn) {
         rememberBtn.addEventListener("click", () => {
+          const t = todayStr();
           setProgress(userId, id, { stage: 0, due: t });
-          renderList(); // フィルタ即時反映（ただし仕様上 stageは0扱いなので変わりにくい）
+          renderList();
         });
       }
 
+      // Unenroll + wrong SE
       const forgetBtn = card.querySelector('[data-act="forget"]');
       if (forgetBtn) {
         forgetBtn.addEventListener("click", () => {
-          deleteProgress(userId, id); // 復習から外す
-          // 効果音: wrong
-          // ※ words.js単体で音を鳴らせないので、review_deps_tmp.jsを使う代替はしない
-          // → 音はaudio.jsで鳴らすため、app.jsから渡す設計にしたいが、今回は最小改修で review.js からグローバルに置く
-          try { window.__tapspeak_playSfx?.("wrong"); } catch {}
+          deleteProgress(userId, id);
+          playSfx("wrong");
           renderList();
         });
       }
@@ -421,10 +360,7 @@ export function renderWordsScreen({
     }
   }
 
-  // フィルタ変更で即時更新
-  catDrop.el.addEventListener("change", renderList, true);
-  stageDrop.el.addEventListener("change", renderList, true);
-  // dropPanelクリックでも更新させる
+  // ドロップダウン操作のたびに更新
   catDrop.el.addEventListener("click", () => setTimeout(renderList, 0));
   stageDrop.el.addEventListener("click", () => setTimeout(renderList, 0));
 
@@ -439,8 +375,4 @@ function escapeHtml(s) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
-}
-
-export function calcNextDue(todayStr, stage) {
-  return nextDueFromStage(todayStr, stage);
 }
