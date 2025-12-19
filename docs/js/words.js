@@ -1,23 +1,32 @@
 // TapSpeak Kids Vocab
-// Version: v2025-01
+// Version: v2025-01b
 
-import { getState,getProgress,setProgress,deleteProgress } from "./storage.js";
+import { getState,getProgress,setProgress,deleteProgress, ensureUser } from "./storage.js";
 import { speakTTS,playSfx } from "./audio.js";
 
+function todayLocalYYYYMMDD(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+
 export async function renderWords(root){
+  const uid = getState().currentUserId;
+  ensureUser(uid);
+
   const res = await fetch("./data/words.json");
   const data = await res.json();
-  const words = Array.isArray(data)?data:data.words;
-  const uid = getState().currentUserId;
+  const words = Array.isArray(data)?data:(data.words||[]);
+  const enabled = words.filter(w => w && w.enabled === true);
 
   const screen = document.createElement("div");
   screen.className="screen";
   root.appendChild(screen);
 
-  words.forEach(w=>{
+  enabled.forEach(w=>{
     const id = `${w.game}:${w.word_key}`;
-    const p = getProgress(uid,id);
-    const enrolled = !!p;
 
     const card = document.createElement("div");
     card.className="card";
@@ -26,59 +35,79 @@ export async function renderWords(root){
   <div class="thumbWrap"></div>
   <div>
     <div class="descRow">
-      <button class="spkbtn">🔊</button>
-      <p>${w.desc_lv2}</p>
+      <button class="spkbtn" type="button" aria-label="desc">🔊</button>
+      <p class="desc"></p>
     </div>
   </div>
 </div>
 <div class="actions"></div>
 `;
+
+    card.querySelector(".desc").textContent = w.desc_lv2 || "";
+
     const thumb = card.querySelector(".thumbWrap");
     let showWord=false;
-    function draw(){
+
+    function drawThumb(){
       thumb.innerHTML="";
       if(showWord){
         const d=document.createElement("div");
         d.className="wordInThumb";
-        d.textContent=w.word;
+        d.textContent=w.word || "";
         thumb.appendChild(d);
       }else{
         const i=document.createElement("img");
+        i.alt="";
         i.src=`./assets/games/${w.game}/${w.category_id}/${w.image_file}`;
         thumb.appendChild(i);
       }
     }
-    draw();
+    drawThumb();
+
+    // 画像タップ：画像枠置換 + 単語TTS
     thumb.onclick=()=>{
       showWord=!showWord;
-      draw();
-      speakTTS(w.word);
+      drawThumb();
+      speakTTS(w.word || "");
     };
 
-    card.querySelector(".spkbtn").onclick=()=>speakTTS(w.desc_lv2);
+    // 説明はスピーカーのみ
+    card.querySelector(".spkbtn").onclick=()=>{
+      speakTTS(w.desc_lv2 || "");
+    };
 
     const act = card.querySelector(".actions");
-    if(enrolled){
-      const b=document.createElement("button");
-      b.className="btn ng";
-      b.textContent="わすれた";
-      b.onclick=()=>{
-        deleteProgress(uid,id);
-        playSfx("wrong");
-        card.remove();
-      };
-      act.appendChild(b);
-    }else{
-      const b=document.createElement("button");
-      b.className="btn ok";
-      b.textContent="おぼえた";
-      b.onclick=()=>{
-        setProgress(uid,id,{stage:0,due:new Date().toISOString().slice(0,10)});
-        playSfx("correct");
-        card.remove();
-      };
-      act.appendChild(b);
+
+    function renderActions(){
+      act.innerHTML = "";
+      const p = getProgress(uid,id);
+      const enrolled = !!p;
+
+      if(enrolled){
+        const b=document.createElement("button");
+        b.className="btn ng";
+        b.textContent="わすれた";
+        b.onclick=()=>{
+          // 単語モードの「わすれた」＝Enroll解除
+          deleteProgress(uid,id);
+          playSfx("wrong");
+          renderActions();
+        };
+        act.appendChild(b);
+      }else{
+        const b=document.createElement("button");
+        b.className="btn ok";
+        b.textContent="おぼえた";
+        b.onclick=()=>{
+          // Enroll
+          setProgress(uid,id,{stage:0,due:todayLocalYYYYMMDD(), wrongToday:false});
+          playSfx("correct");
+          renderActions();
+        };
+        act.appendChild(b);
+      }
     }
+    renderActions();
 
     screen.appendChild(card);
   });
