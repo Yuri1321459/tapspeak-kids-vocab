@@ -4,21 +4,15 @@ function defaultState() {
   return {
     currentUserId: null,
     users: {
-      // id -> {id,label}
       riona: { id: "riona", label: "りおな", points: 0 },
       soma: { id: "soma", label: "そうま", points: 0 },
-      // developer will be created when needed
     },
-    // progressByUser[userId][wordId] = { stage, due }
-    progressByUser: {},
-    // wrongTodayByUser[userId] = { date, map: { [wordId]: true } }
-    wrongTodayByUser: {},
-    // reviewStatsByUser[userId] = { correctSincePoint: number }
-    reviewStatsByUser: {},
-    // avatarsByUser[userId] = dataURL
-    avatarsByUser: {},
-    // pin
+    progressByUser: {},          // progressByUser[userId][wordId] = { stage, due }
+    wrongTodayByUser: {},        // wrongTodayByUser[userId] = { date, map: { [wordId]: true } }
+    reviewStatsByUser: {},       // reviewStatsByUser[userId] = { correctSincePoint: number }
+    avatarsByUser: {},           // avatarsByUser[userId] = dataURL
     pin: "",
+    sfxVolume: 0.8,              // 0.0 - 1.0
   };
 }
 
@@ -31,7 +25,6 @@ export function getState() {
   }
   try {
     const st = JSON.parse(raw);
-    // merge minimal
     return { ...defaultState(), ...st };
   } catch {
     const st = defaultState();
@@ -67,6 +60,7 @@ export function setCurrentUserId(id) {
   setState(st);
 }
 
+/* ===== Avatar ===== */
 export function getAvatarDataUrl(userId) {
   const st = getState();
   return st.avatarsByUser?.[userId] || "";
@@ -79,9 +73,7 @@ export function setAvatarDataUrl(userId, dataUrl) {
   setState(st);
 }
 
-/* ==========
-   PIN
-========== */
+/* ===== PIN ===== */
 export function setPin(pin) {
   const st = getState();
   st.pin = (pin || "").trim();
@@ -93,9 +85,22 @@ export function getPin() {
   return (st.pin || "").trim();
 }
 
-/* ==========
-   Progress
-========== */
+/* ===== SE音量 ===== */
+export function getSfxVolume() {
+  const st = getState();
+  const v = Number(st.sfxVolume);
+  if (Number.isFinite(v)) return Math.max(0, Math.min(1, v));
+  return 0.8;
+}
+
+export function setSfxVolume(v01) {
+  const st = getState();
+  const v = Number(v01);
+  st.sfxVolume = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.8;
+  setState(st);
+}
+
+/* ===== Progress ===== */
 export function getProgress(userId, wordId) {
   const st = getState();
   const p = st.progressByUser?.[userId]?.[wordId];
@@ -118,9 +123,7 @@ export function deleteProgress(userId, wordId) {
   }
 }
 
-/* ==========
-   Wrong today flags
-========== */
+/* ===== Wrong today flags ===== */
 export function markWrongToday(userId, wordId, todayStr) {
   const st = getState();
   st.wrongTodayByUser = st.wrongTodayByUser || {};
@@ -152,9 +155,9 @@ export function getWrongTodaySet(userId, todayStr) {
   return obj.map || {};
 }
 
-/* ==========
-   Points (review only)
-========== */
+/* ===== Points (review only) =====
+   return true if point gained this time
+*/
 export function addReviewCorrect(userId) {
   const st = getState();
   ensureUser(userId);
@@ -162,13 +165,17 @@ export function addReviewCorrect(userId) {
   const rs = st.reviewStatsByUser[userId] || { correctSincePoint: 0 };
 
   rs.correctSincePoint += 1;
+
+  let gained = false;
   if (rs.correctSincePoint >= 10) {
     rs.correctSincePoint = 0;
     st.users[userId].points = (st.users[userId].points || 0) + 1;
+    gained = true;
   }
 
   st.reviewStatsByUser[userId] = rs;
   setState(st);
+  return gained;
 }
 
 export function resetPoints(userId) {
@@ -189,18 +196,13 @@ export function resetLearningKeepAvatar(userId) {
   st.wrongTodayByUser[userId] = { date: "", map: {} };
   st.reviewStatsByUser = st.reviewStatsByUser || {};
   st.reviewStatsByUser[userId] = { correctSincePoint: 0 };
-  // points reset? 仕様には「学習全リセット（PIN要、アバター保持）」とあるので学習進捗のみ。
-  // ただし実用上はポイントも学習に紐づくので、ポイントも0にしておく（要件と衝突しにくい）。
   st.users[userId].points = 0;
   setState(st);
 }
 
-/* ==========
-   Backup
-========== */
+/* ===== Backup ===== */
 export function exportBackupJson() {
   const st = getState();
-  // words.json 本体は含めない
   const payload = {
     v: 1,
     exported_at: new Date().toISOString(),
@@ -211,6 +213,7 @@ export function exportBackupJson() {
     reviewStatsByUser: st.reviewStatsByUser || {},
     avatarsByUser: st.avatarsByUser || {},
     pin: st.pin || "",
+    sfxVolume: st.sfxVolume ?? 0.8,
   };
   return JSON.stringify(payload, null, 2);
 }
@@ -220,7 +223,6 @@ export function importBackupJson(text) {
   if (!obj || typeof obj !== "object") throw new Error("bad");
 
   const st = defaultState();
-  // allow only known keys
   st.currentUserId = obj.currentUserId ?? null;
   st.users = obj.users ?? st.users;
   st.progressByUser = obj.progressByUser ?? {};
@@ -228,6 +230,7 @@ export function importBackupJson(text) {
   st.reviewStatsByUser = obj.reviewStatsByUser ?? {};
   st.avatarsByUser = obj.avatarsByUser ?? {};
   st.pin = obj.pin ?? "";
+  st.sfxVolume = obj.sfxVolume ?? 0.8;
 
   setState(st);
 }
