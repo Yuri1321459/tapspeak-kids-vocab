@@ -8,7 +8,6 @@ import {
   clearWrongToday,
   addReviewCorrect
 } from "./storage.js";
-import { calcNextDue } from "./words.js";
 import { playSfx, speakTTSWait } from "./audio.js";
 
 function el(html) {
@@ -413,3 +412,4 @@ function escapeHtml(s) {
 function wait(ms) {
   return new Promise(res => setTimeout(res, ms));
 }
+
