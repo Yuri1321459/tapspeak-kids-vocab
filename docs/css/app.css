@@ -1,435 +1,412 @@
 /* R-2-2: 見た目のみ（ロジック禁止） */
 
 :root{
-    --bg: #f7f7f9;
-    --fg:#111;
-    --muted:#666;
-    --card: #fff;
-    --line: #e5e5ea;
-    --btn:#111;
-    --btnfg: #fff;
+  --bg:#f7f7f9;
+  --fg:#111;
+  --muted:#666;
+  --card:#fff;
+  --line:#e5e5ea;
+  --btn:#111;
+  --btnfg:#fff;
 
-    /* Active（現在画面の強調） */
-    --active:#2d6cdf;
-    --activefg: #fff;
+  /* Active（現在画面の強調） */
+  --active:#2d6cdf;
+  --activefg:#fff;
 
-    /* Action colors */
-    --ok:#23a55a;
-    --ng: #e5484d;
-    --try: #f59e0b;
-    --hear:#2d6cdf;
+  /* Action colors */
+  --ok:#23a55a;
+  --ng:#e5484d;
+  --try:#f59e0b;
+  --hear:#2d6cdf;
 
-    /* R-8-4: 自然なダーク（暗すぎNG） */
-    --d - bg:#1f232a;
-    --d - fg: #f2f3f5;
-    --d - muted: #b5bac1;
-    --d - card:#2a2f38;
-    --d - line:#3a404b;
-    --d - btn: #f2f3f5;
-    --d - btnfg:#111;
+  /* R-8-4: 自然なダーク（暗すぎNG） */
+  --d-bg:#1f232a;
+  --d-fg:#f2f3f5;
+  --d-muted:#b5bac1;
+  --d-card:#2a2f38;
+  --d-line:#3a404b;
+  --d-btn:#f2f3f5;
+  --d-btnfg:#111;
 }
 
-* { box- sizing: border - box}
-html, body{ height: 100 %}
+*{box-sizing:border-box}
+html,body{height:100%}
 body{
-    margin: 0;
-    font - family: system - ui, -apple - system, Segoe UI, Roboto, sans - serif;
-    background: var(--bg);
-    color: var(--fg);
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);
+  color:var(--fg);
 }
 
-a, button{ cursor: pointer }
+a,button{cursor:pointer}
 button{
-    border: 0;
-    border - radius: 14px;
-    padding: 12px 14px;
-    font - size: 18px;
-    line - height: 1;
-    background: var(--btn);
-    color: var(--btnfg);
+  border:0;
+  border-radius:14px;
+  padding:12px 14px;
+  font-size:18px;
+  line-height:1;
+  background:var(--btn);
+  color:var(--btnfg);
 }
-button:disabled{ opacity: .5; cursor:default }
+button:disabled{opacity:.5;cursor:default}
 
-#app{ min - height: 100 %}
+#app{min-height:100%}
 
 /* Layout */
 .screen{
-    min - height: 100 %;
-    padding: 18px 14px 22px;
+  min-height:100%;
+  padding:18px 14px 22px;
 }
 .center{
-    max - width: 920px;
-    margin: 0 auto;
+  max-width:920px;
+  margin:0 auto;
 }
 .title{
-    text - align: center;
-    font - size: 28px;
-    font - weight: 800;
-    margin: 20px 0 18px;
+  text-align:center;
+  font-size:28px;
+  font-weight:800;
+  margin:20px 0 18px;
 }
-.subtle{ color: var(--muted); font - size: 14px }
+.subtle{color:var(--muted);font-size:14px}
 
 /* R-7-2: 2行固定ヘッダ */
 .header{
-    position: sticky;
-    top: 0;
-    z - index: 10;
-    background: var(--bg);
-    border - bottom: 1px solid var(--line);
+  position:sticky;
+  top:0;
+  z-index:10;
+  background:var(--bg);
+  border-bottom:1px solid var(--line);
 }
 .headerRow{
-    display: flex;
-    align - items: center;
-    justify - content: space - between;
-    gap: 10px;
-    padding: 10px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
 }
-.headerRow + .headerRow{ padding - top: 6px; padding - bottom: 12px }
-.headerLeft,.headerRight{ display: flex; align - items: center; gap: 10px }
+.headerRow + .headerRow{padding-top:6px;padding-bottom:12px}
+.headerLeft,.headerRight{display:flex;align-items:center;gap:10px}
 .iconBtn{
-    width: 40px; height: 40px;
-    border - radius: 14px;
-    display: inline - flex;
-    align - items: center;
-    justify - content: center;
-    background: transparent;
-    color: inherit;
-    border: 1px solid var(--line);
+  width:40px;height:40px;
+  border-radius:14px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:transparent;
+  color:inherit;
+  border:1px solid var(--line);
 }
 .pill{
-    border - radius: 999px;
-    padding: 10px 14px;
-    border: 1px solid var(--line);
-    background: var(--card);
-    color: inherit;
-    font - weight: 700;
+  border-radius:999px;
+  padding:10px 14px;
+  border:1px solid var(--line);
+  background:var(--card);
+  color:inherit;
+  font-weight:700;
 }
 .pill.active{
-    border - width: 2px;
-    background: var(--active);
-    border - color: var(--active);
-    color: var(--activefg);
+  border-width:2px;
+  background:var(--active);
+  border-color:var(--active);
+  color:var(--activefg);
 }
 
 /* Filters (dropdown style) */
-.filters{ display: flex; gap: 10px; flex - wrap: wrap; justify - content: flex - end }
+.filters{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
 .dd{
-    position: relative;
+  position:relative;
 }
 .ddBtn{
-    border - radius: 999px;
-    padding: 10px 14px;
-    border: 1px solid var(--line);
-    background: var(--card);
-    color: inherit;
-    font - weight: 800;
+  border-radius:999px;
+  padding:10px 14px;
+  border:1px solid var(--line);
+  background:var(--card);
+  color:inherit;
+  font-weight:800;
 }
 .ddPanel{
-    position: absolute;
-    right: 0;
-    top: 48px;
-    width: min(360px, 85vw);
-    max - height: 60vh;
-    overflow: auto;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border - radius: 16px;
-    padding: 12px;
-    box - shadow: 0 10px 30px rgba(0, 0, 0, .12);
-    display: none;
+  position:absolute;
+  right:0;
+  top:48px;
+  width:min(360px, 85vw);
+  max-height:60vh;
+  overflow:auto;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,.12);
+  display:none;
 }
-.dd.open.ddPanel{ display: block }
+.dd.open .ddPanel{display:block}
 .chk{
-    display: flex;
-    align - items: center;
-    gap: 10px;
-    padding: 8px 6px;
-    border - radius: 12px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 6px;
+  border-radius:12px;
 }
-.chk:hover{ background: rgba(0, 0, 0, .04) }
-.chk input{ width: 20px; height: 20px }
+.chk:hover{background:rgba(0,0,0,.04)}
+.chk input{width:20px;height:20px}
 .chk span{
-    white - space: pre - line; /* R-7-5-1: 改行を効かせる */
-    line - height: 1.15;
+  white-space:pre-line; /* R-7-5-1: 改行を効かせる */
+  line-height:1.15;
 }
 .chk span.small{
-    font - size: 12px; /* R-7-5-2: 長い場合だけ小さく */
+  font-size:12px; /* R-7-5-2: 長い場合だけ小さく */
 }
 .grid2{
-    display: grid;
-    grid - template - columns: 1fr 1fr;
-    gap: 6px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
 }
 
 /* Cards */
 .list{
-    display: grid;
-    grid - template - columns: repeat(auto - fill, minmax(260px, 1fr));
-    gap: 12px;
-    padding - top: 14px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));
+  gap:12px;
+  padding-top:14px;
 }
 .card{
-    background: var(--card);
-    border: 1px solid var(--line);
-    border - radius: 18px;
-    padding: 12px;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:12px;
 
-    display: flex;              /* R-8-3-3: 下端揃え */
-    flex - direction: column;     /* R-8-3-3: 下端揃え */
+  display:flex;              /* R-8-3-3: 下端揃え */
+  flex-direction:column;     /* R-8-3-3: 下端揃え */
 }
 .imgBox{
-    width: 100 %;
-    aspect - ratio: 1 / 1;
-    border - radius: 16px;
-    border: 1px solid var(--line);
-    overflow: hidden;
-    background: #fff;
-    display: flex;
-    align - items: center;
-    justify - content: center;
-    position: relative;
+  width:100%;
+  aspect-ratio:1/1;
+  border-radius:16px;
+  border:1px solid var(--line);
+  overflow:hidden;
+  background:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
 }
 .imgBox img{
-    width: 100 %;
-    height: 100 %;
-    object - fit: contain;
-    display: block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
 }
 .wordOverlay{
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align - items: center;
-    justify - content: center;
-    padding: 10px;
-    text - align: center;
-    font - weight: 900;
-    font - size: 28px;
-    line - height: 1.1;
-    background: rgba(255, 255, 255, .92);
-    color:#111;
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px;
+  text-align:center;
+  font-weight:900;
+  font-size:28px;
+  line-height:1.1;
+  background:rgba(255,255,255,.92);
+  color:#111;
 }
 .descRow{
-    display: flex;
-    align - items: flex - start;
-    gap: 10px;
-    margin - top: 10px;
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  margin-top:10px;
 }
 .spkr{
-    width: 42px; height: 42px;
-    border - radius: 14px;
-    border: 1px solid var(--line);
-    background: transparent;
-    color: inherit;
-    font - size: 18px;
-    display: inline - flex;
-    align - items: center;
-    justify - content: center;
+  width:42px;height:42px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background:transparent;
+  color:inherit;
+  font-size:18px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
 }
 .desc{
-    margin: 0;
-    color: var(--fg);
-    font - size: 15px;
-    line - height: 1.35;
+  margin:0;
+  color:var(--fg);
+  font-size:15px;
+  line-height:1.35;
 }
 .actions{
-    margin - top: auto;           /* R-8-3-3: 下端揃え */
-    padding - top: 12px;
-    display: flex;
-    gap: 10px;
+  margin-top:auto;           /* R-8-3-3: 下端揃え */
+  padding-top:12px;
+  display:flex;
+  gap:10px;
 }
-.actions button{ flex: 1 }
+.actions button{flex:1}
 
 /* Action button variants */
-.btnOk{ background: var(--ok)!important; color: #fff!important; }
-.btnNg{ background: var(--ng)!important; color: #fff!important; }
-.btnTry{ background: var(--try) !important; color:#111!important; }
-.btnHear{ background: var(--hear)!important; color: #fff!important; }
+.btnOk{ background:var(--ok) !important; color:#fff !important; }
+.btnNg{ background:var(--ng) !important; color:#fff !important; }
+.btnTry{ background:var(--try) !important; color:#111 !important; }
+.btnHear{ background:var(--hear) !important; color:#fff !important; }
 
 /* Home & User select */
 .bigBtns{
-    display: flex;
-    flex - direction: column;
-    gap: 12px;
-    max - width: 420px;
-    margin: 18px auto 0;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  max-width:420px;
+  margin:18px auto 0;
 }
 .userBtn{
-    display: flex;
-    align - items: center;
-    justify - content: space - between;
-    gap: 12px;
-    padding: 16px 16px;
-    border - radius: 18px;
-    background: var(--card);
-    color: var(--fg);
-    border: 2px solid var(--line);
-    font - weight: 900;
-    font - size: 22px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:16px 16px;
+  border-radius:18px;
+  background:var(--card);
+  color:var(--fg);
+  border:2px solid var(--line);
+  font-weight:900;
+  font-size:22px;
 }
 .avatar{
-    width: 44px; height: 44px;
-    border - radius: 16px;
-    border: 1px solid var(--line);
-    background: #fff;
-    overflow: hidden;
-    display: flex;
-    align - items: center;
-    justify - content: center;
-    flex: 0 0 auto;
-    font - size: 18px;
-    font - weight: 900;
+  width:44px;height:44px;
+  border-radius:16px;
+  border:1px solid var(--line);
+  background:#fff;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  font-size:18px;
+  font-weight:900;
 }
-.avatar img{ width: 100 %; height: 100 %; object - fit: cover }
+.avatar img{width:100%;height:100%;object-fit:cover}
 .footerDev{
-    position: fixed;
-    left: 0; right: 0; bottom: 10px;
-    text - align: center;
+  position:fixed;
+  left:0;right:0;bottom:10px;
+  text-align:center;
 }
 .devBtn{
-    font - size: 12px;
-    padding: 8px 12px;
-    border - radius: 999px;
-    background: transparent;
-    color: var(--muted);
-    border: 1px solid var(--line);
+  font-size:12px;
+  padding:8px 12px;
+  border-radius:999px;
+  background:transparent;
+  color:var(--muted);
+  border:1px solid var(--line);
 }
 
 .homeTop{
-    display: flex;
-    align - items: center;
-    justify - content: space - between;
-    padding: 10px 4px 0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 4px 0;
 }
 .homeMid{
-    display: flex;
-    flex - direction: column;
-    gap: 14px;
-    margin: 34px auto 0;
-    max - width: 520px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  margin:34px auto 0;
+  max-width:520px;
 }
 .homeCard{
-    background: var(--card);
-    border: 2px solid var(--line);
-    border - radius: 20px;
-    padding: 18px;
-    text - align: center;
-    font - size: 26px;
-    font - weight: 900;
+  background:var(--card);
+  border:2px solid var(--line);
+  border-radius:20px;
+  padding:18px;
+  text-align:center;
+  font-size:26px;
+  font-weight:900;
 
-    color: var(--fg); /* R-8-2-1: ホームは黒文字 */
+  color:var(--fg); /* R-8-2-1: ホームは黒文字 */
 }
 .homeSmall{
-    position: fixed;
-    left: 0; right: 0; bottom: 14px;
-    text - align: center;
+  position:fixed;
+  left:0;right:0;bottom:14px;
+  text-align:center;
 }
 .homeSmall button{
-    background: transparent;
-    border: 1px solid var(--line);
-    color: var(--muted);
-    font - size: 14px;
-    padding: 10px 14px;
-    border - radius: 999px;
+  background:transparent;
+  border:1px solid var(--line);
+  color:var(--muted);
+  font-size:14px;
+  padding:10px 14px;
+  border-radius:999px;
 }
 
 /* Review header count */
 .reviewCount{
-    margin: 10px 0 0;
-    font - weight: 900;
-    font - size: 20px;
+  margin:10px 0 0;
+  font-weight:900;
+  font-size:20px;
 }
 
 /* Popups & sparkle */
 .popup{
-    position: fixed;
-    left: 50 %;
-    top: 18 %;
-    transform: translateX(-50 %);
-    background: rgba(0, 0, 0, .78);
-    color: #fff;
-    padding: 12px 14px;
-    border - radius: 14px;
-    font - weight: 900;
-    font - size: 18px;
-    opacity: 0;
-    pointer - events: none;
-    transition:opacity .15s ease;
-    z - index: 50;
+  position:fixed;
+  left:50%;
+  top:18%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,.78);
+  color:#fff;
+  padding:12px 14px;
+  border-radius:14px;
+  font-weight:900;
+  font-size:18px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .15s ease;
+  z-index:50;
 }
-.popup.show{ opacity: 1 }
+.popup.show{opacity:1}
 
 .sparkle{
-    position: fixed;
-    left: 50 %;
-    top: 22 %;
-    transform: translateX(-50 %);
-    font - size: 32px;
-    opacity: 0;
-    pointer - events: none;
-    transition:opacity .15s ease;
-    z - index: 50;
+  position:fixed;
+  left:50%;
+  top:22%;
+  transform:translateX(-50%);
+  font-size:32px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .15s ease;
+  z-index:50;
 }
-.sparkle.show{ opacity: 1 }
+.sparkle.show{opacity:1}
 
 /* Dark theme wrapper */
 .dark{
-    background: var(--d - bg);
-    color: var(--d - fg);
+  background:var(--d-bg);
+  color:var(--d-fg);
 }
-.dark.header{ background: var(--d - bg); border - bottom: 1px solid var(--d - line) }
-.dark.iconBtn{ border - color: var(--d - line); color: var(--d - fg) }
-.dark.pill{ background: var(--d - card); border - color: var(--d - line); color: var(--d - fg) }
-.dark.ddBtn{ background: var(--d - card); border - color: var(--d - line); color: var(--d - fg) } /* R-8-4-1 */
-.dark.ddPanel{ background: var(--d - card); border - color: var(--d - line) }
-.dark.chk:hover{ background: rgba(255, 255, 255, .06) }
-.dark.card{ background: var(--d - card); border - color: var(--d - line) }
-.dark.imgBox{ border - color: var(--d - line); background:#111 }
-.dark.spkr{ border - color: var(--d - line) }
-.dark.desc{ color: var(--d - fg) }
+.dark .header{background:var(--d-bg);border-bottom:1px solid var(--d-line)}
+.dark .iconBtn{border-color:var(--d-line); color:var(--d-fg)}
+.dark .pill{background:var(--d-card);border-color:var(--d-line); color:var(--d-fg)}
+.dark .ddBtn{background:var(--d-card);border-color:var(--d-line); color:var(--d-fg)} /* R-8-4-1 */
+.dark .ddPanel{background:var(--d-card);border-color:var(--d-line)}
+.dark .chk:hover{background:rgba(255,255,255,.06)}
+.dark .card{background:var(--d-card);border-color:var(--d-line)}
+.dark .imgBox{border-color:var(--d-line);background:#111}
+.dark .spkr{border-color:var(--d-line)}
+.dark .desc{color:var(--d-fg)}
 
 /* Dark: default action buttons */
 .dark button{
-    background: var(--d - btn);
-    color: var(--d - btnfg);
+  background:var(--d-btn);
+  color:var(--d-btnfg);
 }
-.dark.actions button{ background: var(--d - btn); color: var(--d - btnfg) }
+.dark .actions button{background:var(--d-btn);color:var(--d-btnfg)}
 
 /* Dark: keep header/filter buttons dark & white */
-.dark.pill,
-.dark.ddBtn,
-.dark.iconBtn{
-    background: var(--d - card);
-    color: var(--d - fg);
+.dark .pill,
+.dark .ddBtn,
+.dark .iconBtn{
+  background:var(--d-card);
+  color:var(--d-fg);
 }
 
 /* Keep active blue on dark too */
-.dark.pill.active{
-    background: var(--active);
-    border - color: var(--active);
-    color: var(--activefg);
+.dark .pill.active{
+  background:var(--active);
+  border-color:var(--active);
+  color:var(--activefg);
 }
-.userBadgeBtn{
-    display: inline - flex;
-    align - items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    border - radius: 999px;
-    border: 1px solid var(--line);
-    background: var(--card);
-    color: var(--fg);
-    font - weight: 900;
-}
-.userBadgeBtn.avatar{
-    width: 32px; height: 32px;
-    border - radius: 12px;
-}
-.userBadgeName{ font - size: 16px; line - height: 1; }
-
-.dark.userBadgeBtn{
-    border - color: var(--d - line);
-    background: var(--d - card);
-    color: var(--d - fg);
-}
-.dark.userBadgeBtn.avatar{ border - color: var(--d - line); }
 
