@@ -9,6 +9,16 @@
   --btn:#111;
   --btnfg:#fff;
 
+  /* Active（現在画面の強調） */
+  --active:#2d6cdf;
+  --activefg:#fff;
+
+  /* Action colors */
+  --ok:#23a55a;
+  --ng:#e5484d;
+  --try:#f59e0b;
+  --hear:#2d6cdf;
+
   /* R-8-4: 自然なダーク（暗すぎNG） */
   --d-bg:#1f232a;
   --d-fg:#f2f3f5;
@@ -96,6 +106,9 @@ button:disabled{opacity:.5;cursor:default}
 }
 .pill.active{
   border-width:2px;
+  background:var(--active);
+  border-color:var(--active);
+  color:var(--activefg);
 }
 
 /* Filters (dropdown style) */
@@ -135,6 +148,13 @@ button:disabled{opacity:.5;cursor:default}
 }
 .chk:hover{background:rgba(0,0,0,.04)}
 .chk input{width:20px;height:20px}
+.chk span{
+  white-space:pre-line; /* R-7-5-1: 改行を効かせる */
+  line-height:1.15;
+}
+.chk span.small{
+  font-size:12px; /* R-7-5-2: 長い場合だけ小さく */
+}
 .grid2{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -153,6 +173,9 @@ button:disabled{opacity:.5;cursor:default}
   border:1px solid var(--line);
   border-radius:18px;
   padding:12px;
+
+  display:flex;              /* R-8-3-3: 下端揃え */
+  flex-direction:column;     /* R-8-3-3: 下端揃え */
 }
 .imgBox{
   width:100%;
@@ -210,11 +233,18 @@ button:disabled{opacity:.5;cursor:default}
   line-height:1.35;
 }
 .actions{
-  margin-top:12px;
+  margin-top:auto;           /* R-8-3-3: 下端揃え */
+  padding-top:12px;
   display:flex;
   gap:10px;
 }
 .actions button{flex:1}
+
+/* Action button variants */
+.btnOk{ background:var(--ok) !important; color:#fff !important; }
+.btnNg{ background:var(--ng) !important; color:#fff !important; }
+.btnTry{ background:var(--try) !important; color:#111 !important; }
+.btnHear{ background:var(--hear) !important; color:#fff !important; }
 
 /* Home & User select */
 .bigBtns{
@@ -232,7 +262,7 @@ button:disabled{opacity:.5;cursor:default}
   padding:16px 16px;
   border-radius:18px;
   background:var(--card);
-  color:inherit;
+  color:var(--fg);
   border:2px solid var(--line);
   font-weight:900;
   font-size:22px;
@@ -286,6 +316,8 @@ button:disabled{opacity:.5;cursor:default}
   text-align:center;
   font-size:26px;
   font-weight:900;
+
+  color:var(--fg); /* R-8-2-1: ホームは黒文字 */
 }
 .homeSmall{
   position:fixed;
@@ -346,17 +378,34 @@ button:disabled{opacity:.5;cursor:default}
   color:var(--d-fg);
 }
 .dark .header{background:var(--d-bg);border-bottom:1px solid var(--d-line)}
-.dark .iconBtn{border-color:var(--d-line)}
-.dark .pill{background:var(--d-card);border-color:var(--d-line)}
-.dark .ddBtn{background:var(--d-card);border-color:var(--d-line)}
+.dark .iconBtn{border-color:var(--d-line); color:var(--d-fg)}
+.dark .pill{background:var(--d-card);border-color:var(--d-line); color:var(--d-fg)}
+.dark .ddBtn{background:var(--d-card);border-color:var(--d-line); color:var(--d-fg)} /* R-8-4-1 */
 .dark .ddPanel{background:var(--d-card);border-color:var(--d-line)}
 .dark .chk:hover{background:rgba(255,255,255,.06)}
 .dark .card{background:var(--d-card);border-color:var(--d-line)}
 .dark .imgBox{border-color:var(--d-line);background:#111}
 .dark .spkr{border-color:var(--d-line)}
 .dark .desc{color:var(--d-fg)}
+
+/* Dark: default action buttons */
 .dark button{
   background:var(--d-btn);
   color:var(--d-btnfg);
 }
 .dark .actions button{background:var(--d-btn);color:var(--d-btnfg)}
+
+/* Dark: keep header/filter buttons dark & white */
+.dark .pill,
+.dark .ddBtn,
+.dark .iconBtn{
+  background:var(--d-card);
+  color:var(--d-fg);
+}
+
+/* Keep active blue on dark too */
+.dark .pill.active{
+  background:var(--active);
+  border-color:var(--active);
+  color:var(--activefg);
+}
