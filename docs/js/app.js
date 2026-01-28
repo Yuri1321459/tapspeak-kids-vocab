@@ -409,11 +409,19 @@
         resetPointsBtn.type = "button";
         resetPointsBtn.textContent = "ポイントリセット";
         resetPointsBtn.addEventListener("click", () => {
-            if (!requirePin()) return;
-            window.AppStorage.resetPoints(userId);
-            renderSettings();
-        });
+  if (!requirePin()) return;
 
+  const cur = window.AppStorage.getPoints(userId);
+  const usedStr = prompt(`使用ポイントを入力してください（現在 ${cur}）`, "");
+  if (usedStr === null) return;
+
+  const used = Number(usedStr);
+  if (!Number.isFinite(used) || used <= 0) return;
+
+  window.AppStorage.usePoints(userId, used);
+  renderSettings();
+});
+      
         // 学習全リセット（PIN要・アバター保持）
         const resetAllBtn = document.createElement("button");
         resetAllBtn.type = "button";
@@ -464,4 +472,5 @@
         settings: renderSettings
     };
 })();
+
 
