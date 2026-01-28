@@ -213,6 +213,14 @@
     u.settings = { ...DEFAULT_USER().settings, ...settings, avatarDataUrl: avatar };
     setUser(userId, u);
   }
+  
+function usePoints(userId, used) {
+  const u = getUser(userId);
+  const cur = Number(u.points) || 0;
+  const n = Math.max(0, cur - Number(used || 0));
+  u.points = n;
+  setUser(userId, u);
+}
 
   function exportCurrentUserBackup(userId) {
     // R-11-2: 現在ユーザーのみJSON
@@ -261,3 +269,4 @@
     importCurrentUserBackup
   };
 })();
+
