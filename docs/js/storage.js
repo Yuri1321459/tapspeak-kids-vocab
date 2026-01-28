@@ -266,7 +266,9 @@ function usePoints(userId, used) {
     resetPoints,
     resetLearningKeepAvatar,
     exportCurrentUserBackup,
-    importCurrentUserBackup
+    importCurrentUserBackup,
+    usePoints
   };
 })();
+
 
